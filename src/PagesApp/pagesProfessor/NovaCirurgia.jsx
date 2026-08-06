@@ -21,6 +21,7 @@ export default function NovaCirurgia() {
   const [pacientes, setPacientes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [mutiroes, setMutiroes] = useState([]);
+  const [disciplinas, setDisciplinas] = useState([]);
 
   const [pacienteId, setPacienteId] = useState('');
   const [usuarioId, setUsuarioId] = useState('');
@@ -29,6 +30,7 @@ export default function NovaCirurgia() {
   const [status, setStatus] = useState('agendada');
   const [mutiraoId, setMutiraoId] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [disciplina, setDisciplina] = useState('');
 
   // Alunos vinculados (compartilhamento de curso)
   const [alunosVinculados, setAlunosVinculados] = useState([]);
@@ -42,6 +44,7 @@ export default function NovaCirurgia() {
     api.get('/pacientes').then((r) => setPacientes(r.data)).catch(() => {});
     api.get('/usuarios').then((r) => setUsuarios(r.data)).catch(() => {});
     api.get('/cirurgias/mutiroes').then((r) => setMutiroes(r.data)).catch(() => {});
+    api.get('/consultas/disciplinas').then((r) => setDisciplinas(r.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -58,6 +61,7 @@ export default function NovaCirurgia() {
     setStatus(cirurgiaEdicao.status || 'agendada');
     setMutiraoId(cirurgiaEdicao.mutirao_id ? String(cirurgiaEdicao.mutirao_id) : '');
     setObservacoes(cirurgiaEdicao.observacoes || '');
+    setDisciplina(cirurgiaEdicao.disciplina || '');
     api.get(`/cirurgias/${cirurgiaEdicao.id}/alunos`)
       .then((r) => setAlunosVinculados(r.data))
       .catch(() => {});
@@ -106,6 +110,7 @@ export default function NovaCirurgia() {
         usuario_id: Number(usuarioId),
         data_hora: new Date(dataHora).toISOString(),
         tipo_cirurgia: tipoCirurgia || undefined,
+        disciplina: disciplina || undefined,
         status,
         observacoes: observacoes || undefined,
         mutirao_id: mutiraoId ? Number(mutiraoId) : undefined,
@@ -170,6 +175,14 @@ export default function NovaCirurgia() {
         <div className="space-y-1">
           <label className="text-gray-700 text-xs font-bold block">Data e hora <span className="text-red-500">*</span></label>
           <input type="datetime-local" value={dataHora} onChange={(e) => setDataHora(e.target.value)} className={cls} required />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-gray-700 text-xs font-bold block">Disciplina</label>
+          <select value={disciplina} onChange={(e) => setDisciplina(e.target.value)} className={cls}>
+            <option value="">Selecione a disciplina</option>
+            {disciplinas.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
         </div>
 
         <div className="space-y-1">

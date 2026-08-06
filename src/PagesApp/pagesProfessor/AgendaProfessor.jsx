@@ -28,9 +28,17 @@ export default function AgendaProfessor() {
   const [pacientesPorId, setPacientesPorId] = useState({});
   const [carregando, setCarregando] = useState(true);
 
-  // O backend não tem conceito de "disciplina" em consultas — mantemos
-  // só "Todas as disciplinas" como grupo único e real.
-  const listaDisciplinas = ['Todas as disciplinas'];
+  // Disciplinas vindas do backend (GET /consultas/disciplinas). A lista era
+  // fixa com um item só porque a coluna consulta.disciplina não existia —
+  // ficou de fora quando a migration 002 original foi reescrita. Recriada
+  // na migration 012.
+  const [listaDisciplinas, setListaDisciplinas] = useState(['Todas as disciplinas']);
+
+  useEffect(() => {
+    api.get('/consultas/disciplinas')
+      .then((res) => setListaDisciplinas(['Todas as disciplinas', ...res.data]))
+      .catch((err) => console.error('Erro ao carregar disciplinas:', err));
+  }, []);
 
   useEffect(() => {
     Promise.all([api.get('/consultas'), api.get('/pacientes')])
@@ -52,24 +60,37 @@ export default function AgendaProfessor() {
     return `${ano}-${mes}-${dia}`;
   }, [dataAtual, diaSelecionado]);
 
-  // Agrupa as consultas reais do dia selecionado (grupo único "Geral")
+  // Agrupa as consultas do dia por disciplina e aplica o filtro escolhido
+  // no seletor do topo. Consultas antigas, agendadas antes da coluna
+  // existir, ficam em "Sem disciplina" em vez de sumirem da agenda.
   const agendamentosAgrupados = useMemo(() => {
     const doDia = consultas.filter((item) => {
       const iso = new Date(item.data_hora).toISOString().split('T')[0];
-      return iso === stringDataSelecionada;
+      if (iso !== stringDataSelecionada) return false;
+      if (disciplinaSelecionada === 'Todas as disciplinas') return true;
+      return item.disciplina === disciplinaSelecionada;
     });
 
-    return [{
-      disciplina: 'Geral',
-      pacientes: doDia.map((item) => ({
+    const porDisciplina = new Map();
+    doDia.forEach((item) => {
+      const chave = item.disciplina || 'Sem disciplina';
+      if (!porDisciplina.has(chave)) porDisciplina.set(chave, []);
+      porDisciplina.get(chave).push({
         id: item.id,
         pacienteId: item.paciente_id,
         hora: new Date(item.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         nome: pacientesPorId[item.paciente_id] || 'Paciente',
         procedimento: item.queixa_principal || 'Consulta',
-      })),
-    }];
-  }, [consultas, pacientesPorId, stringDataSelecionada]);
+      });
+    });
+
+    return [...porDisciplina.entries()]
+      .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+      .map(([disciplina, pacientes]) => ({
+        disciplina,
+        pacientes: pacientes.sort((a, b) => a.hora.localeCompare(b.hora)),
+      }));
+  }, [consultas, pacientesPorId, stringDataSelecionada, disciplinaSelecionada]);
 
   // Utilitários de Data
   const formatarMesAno = (date) => {

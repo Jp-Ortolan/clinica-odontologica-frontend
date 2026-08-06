@@ -13,6 +13,10 @@ export default function AgendarConsulta() {
 
   // Estados do formulário
   const [disciplina, setDisciplina] = useState('');
+  // Lista vinda do backend. Antes era escrita à mão aqui e divergia: tinha
+  // "Cirurgia" (o nome real é "Cirurgia Bucal") e faltavam Ortodontia,
+  // Prótese e Reabilitação Bucal.
+  const [disciplinas, setDisciplinas] = useState([]);
   const [tipoConsulta, setTipoConsulta] = useState('Avaliação');
   const [usuarioId, setUsuarioId] = useState('');
   const [profissionais, setProfissionais] = useState([]);
@@ -46,6 +50,12 @@ export default function AgendarConsulta() {
   // O backend não tem busca por nome/cpf via query — trazemos todos os
   // pacientes uma vez e filtramos aqui no front a cada tecla digitada.
   const [todosPacientes, setTodosPacientes] = useState([]);
+
+  useEffect(() => {
+    api.get('/consultas/disciplinas')
+      .then((res) => setDisciplinas(res.data))
+      .catch((err) => console.error('Erro ao carregar disciplinas:', err));
+  }, []);
 
   useEffect(() => {
     api.get('/pacientes')
@@ -111,7 +121,10 @@ export default function AgendarConsulta() {
         paciente_id: pacienteSelecionado.id,
         usuario_id: Number(usuarioId),
         data_hora: `${data}T${hora}:00`,
-        queixa_principal: disciplina ? `${disciplina} — ${tipoConsulta}` : tipoConsulta,
+        // A disciplina agora tem coluna própria (migration 012); antes era
+        // grudada no texto da queixa, gerando coisas como "Cirurgia — Cirurgia".
+        disciplina: disciplina || undefined,
+        queixa_principal: tipoConsulta,
         observacoes,
         status: 'agendada'
       };
@@ -292,11 +305,9 @@ export default function AgendarConsulta() {
             className="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm font-medium text-gray-700 focus:outline-none focus:border-[#3B44A8]"
           >
             <option value="">Selecione uma disciplina</option>
-            <option value="Periodontia">Periodontia</option>
-            <option value="Endodontia">Endodontia</option>
-            <option value="Dentística">Dentística</option>
-            <option value="Odontopediatria">Odontopediatria</option>
-            <option value="Cirurgia">Cirurgia</option>
+            {disciplinas.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
           </select>
         </div>
 

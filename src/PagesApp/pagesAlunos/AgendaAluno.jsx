@@ -29,18 +29,16 @@ export default function AgendaAluno() {
   // Estados de Data
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
 
-  // Lista de Disciplinas disponíveis para filtro
-  const listaDisciplinas = [
-    'Todas as disciplinas',
-    'Dentística',
-    'Endodontia',
-    'Periodontia',
-    'Ortodontia',
-    'Odontopediatria',
-    'Cirurgia Bucal',
-    'Prótese',
-    'Reabilitação Bucal'
-  ];
+  // Disciplinas vindas do backend (GET /consultas/disciplinas). Antes esta
+  // lista era escrita à mão aqui, mas o filtro nunca funcionava porque a
+  // coluna consulta.disciplina não existia — recriada na migration 012.
+  const [listaDisciplinas, setListaDisciplinas] = useState(['Todas as disciplinas']);
+
+  useEffect(() => {
+    api.get('/consultas/disciplinas')
+      .then((res) => setListaDisciplinas(['Todas as disciplinas', ...res.data]))
+      .catch((err) => console.error('Erro ao carregar disciplinas:', err));
+  }, []);
 
   // Helper para formatar data local no padrão YYYY-MM-DD
   const formatarDataIso = (date) => {
@@ -50,8 +48,8 @@ export default function AgendaAluno() {
     return `${ano}-${mes}-${dia}`;
   };
 
-  // O backend não filtra por data nem tem conceito de "disciplina" nas
-  // consultas — buscamos tudo e filtramos aqui pelo dia selecionado.
+  // O backend não filtra por data, então buscamos tudo e separamos aqui
+  // pelo dia selecionado. A disciplina agora vem do próprio registro.
   const carregarAgendamentos = useCallback(async () => {
     try {
       setCarregando(true);
@@ -70,18 +68,29 @@ export default function AgendaAluno() {
         (c) => formatarDataIso(new Date(c.data_hora)) === dataFormatada
       );
 
-      const grupo = {
-        disciplina: 'Geral',
-        pacientes: doDia.map((item) => ({
+      // Agrupa por disciplina real. Consultas antigas, agendadas antes de
+      // a coluna existir, caem em "Sem disciplina" em vez de sumir.
+      const porDisciplina = new Map();
+      doDia.forEach((item) => {
+        const chave = item.disciplina || 'Sem disciplina';
+        if (!porDisciplina.has(chave)) porDisciplina.set(chave, []);
+        porDisciplina.get(chave).push({
           id: item.id,
           hora: new Date(item.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           nome: nomePorPacienteId[item.paciente_id] || 'Paciente sem nome',
           procedimento: item.queixa_principal || 'Consulta',
           dadosOriginais: item
-        }))
-      };
+        });
+      });
 
-      setAgendamentos([grupo]);
+      setAgendamentos(
+        [...porDisciplina.entries()]
+          .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+          .map(([disciplina, pacientes]) => ({
+            disciplina,
+            pacientes: pacientes.sort((a, b) => a.hora.localeCompare(b.hora)),
+          }))
+      );
     } catch (err) {
       console.error('Erro ao buscar agendamentos:', err);
       setErro('Falha ao carregar agendamentos do dia.');
