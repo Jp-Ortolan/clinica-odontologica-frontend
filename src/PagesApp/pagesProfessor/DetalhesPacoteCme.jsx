@@ -65,7 +65,7 @@ export default function DetalhesPacoteCme() {
 
   if (carregando) {
     return (
-      <div className="w-full h-screen bg-[#3B42B2] flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-[#3B42B2]">
         <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
       </div>
     );
@@ -73,7 +73,7 @@ export default function DetalhesPacoteCme() {
 
   if (!pacote || erro) {
     return (
-      <div className="w-full h-screen bg-[#3B42B2] text-white flex flex-col items-center justify-center gap-4 p-6 text-center">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center bg-[#3B42B2] text-white">
         <p className="font-bold text-sm">{erro || 'Nenhum pacote selecionado.'}</p>
         <button
           onClick={() => navigate('/app/professor/cme/pacotes-esterilizados')}
@@ -107,7 +107,7 @@ export default function DetalhesPacoteCme() {
   const status = STATUS_CONFIG[pacote.status] || STATUS_CONFIG.esterilizado;
 
   return (
-    <div className={`w-full h-screen ${BRAND_COLOR} text-white flex flex-col font-sans overflow-hidden relative select-none`}>
+    <div className={`flex-1 flex flex-col min-h-0 ${BRAND_COLOR} text-white font-sans overflow-hidden relative select-none`}>
 
       {/* ESTILOS DE IMPRESSÃO - Visível apenas quando window.print() for chamado */}
       <style>{`

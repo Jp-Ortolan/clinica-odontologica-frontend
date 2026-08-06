@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, Info, ChevronDown, AlertCircle } from 'lucide-react';
 import api from '../../Services/api';
+
+const ACAO_LABEL = { listar: 'Visualizar', criar: 'Criar', editar: 'Editar', remover: 'Remover' };
 
 export default function NovoUsuario() {
   const navigate = useNavigate();
@@ -9,6 +11,16 @@ export default function NovoUsuario() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
+  // Matriz real de permissões (GET /permissoes) — é a mesma coisa que está
+  // escrita nas rotas do backend via autorizar(...).
+  const [matrizPermissoes, setMatrizPermissoes] = useState([]);
+
+  useEffect(() => {
+    api.get('/permissoes')
+      .then((res) => setMatrizPermissoes(res.data))
+      .catch((err) => console.error('Erro ao carregar permissões:', err));
+  }, []);
+
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -18,14 +30,6 @@ export default function NovoUsuario() {
     status: '',
     perfil: '',
     senhaTemporaria: '',
-    permissoes: {
-      pacientes: false,
-      cirurgias: false,
-      cme: false,
-      consultas: false,
-      estoque: false,
-      configuracoes: false,
-    }
   });
 
   // Funções para aplicar máscaras nos campos de texto
@@ -54,16 +58,6 @@ export default function NovoUsuario() {
     if (name === 'telefone') formattedValue = maskPhone(value);
 
     setFormData(prev => ({ ...prev, [name]: formattedValue }));
-  };
-
-  const handleCheckboxChange = (key) => {
-    setFormData(prev => ({
-      ...prev,
-      permissoes: {
-        ...prev.permissoes,
-        [key]: !prev.permissoes[key]
-      }
-    }));
   };
 
   const handleSubmit = async (e) => {
@@ -99,7 +93,7 @@ export default function NovoUsuario() {
   };
 
   return (
-    <div className="w-full h-full min-h-screen bg-[#3B42B2] text-white flex flex-col justify-between font-sans m-0 p-0 overflow-x-hidden">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#3B42B2] text-white font-sans overflow-x-hidden">
       
       {/* TOPO FIXO */}
       <div className="pt-8 pb-4 px-6 text-white flex items-center justify-between shrink-0">
@@ -303,36 +297,53 @@ export default function NovoUsuario() {
             </div>
           </div>
 
-          {/* SEÇÃO 3: PERMISSÕES ADICIONAIS */}
+          {/* SEÇÃO 3: O QUE ESTE PERFIL PODE FAZER */}
+          {/*
+            Antes aqui havia 6 checkboxes de "permissões adicionais" que nunca
+            eram enviadas ao backend — decoração pura. O acesso real é definido
+            pelo PERFIL escolhido acima (o middleware autorizar(...) de cada
+            rota). Em vez de fingir uma configuração que não existe, mostramos
+            o que aquele perfil de fato permite, lido de GET /permissoes.
+          */}
           <div className="space-y-3 pt-2">
             <div>
-              <h2 className="text-[#3B42B2] font-extrabold text-sm">Permissões adicionais</h2>
-              <p className="text-[11px] text-slate-400 font-medium">Defina as permissões específicas para esse usuário.</p>
+              <h2 className="text-[#3B42B2] font-extrabold text-sm">O que este perfil pode fazer</h2>
+              <p className="text-[11px] text-slate-400 font-medium">
+                O acesso é definido pelo perfil selecionado acima.
+              </p>
             </div>
 
-            <div className="space-y-3 pt-1">
-              {[
-                { id: 'pacientes', label: 'Pacientes', desc: 'Acesso ao cadastro e histórico' },
-                { id: 'cirurgias', label: 'Cirurgias', desc: 'Gestão de cirurgias e mutirões' },
-                { id: 'cme', label: 'CME', desc: 'Central de Material Esterilizado' },
-                { id: 'consultas', label: 'Consultas', desc: 'Agendamento e gestão' },
-                { id: 'estoque', label: 'Estoque', desc: 'Controle de estoque e materiais' },
-                { id: 'configuracoes', label: 'Configurações', desc: 'Acesso às configurações' },
-              ].map((item) => (
-                <label key={item.id} className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={formData.permissoes[item.id]}
-                    onChange={() => handleCheckboxChange(item.id)}
-                    className="w-4 h-4 rounded border-slate-300 text-[#3B42B2] focus:ring-[#3B42B2] mt-0.5 cursor-pointer accent-[#3B42B2]"
-                  />
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-xs leading-tight">{item.label}</h4>
-                    <p className="text-[10px] text-slate-400 font-medium">{item.desc}</p>
+            {!formData.perfil ? (
+              <div className="border border-dashed border-slate-200 rounded-xl p-4 text-center">
+                <p className="text-[11px] text-slate-400 font-semibold">
+                  Selecione um perfil de acesso para ver as permissões.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                {matrizPermissoes
+                  .map((m) => ({
+                    modulo: m.modulo.replace(/\./g, ' › '),
+                    acoes: Object.entries(m.perfis || {})
+                      .filter(([, lista]) => lista.includes(formData.perfil))
+                      .map(([acao]) => ACAO_LABEL[acao] || acao),
+                  }))
+                  .filter((m) => m.acoes.length > 0)
+                  .map((m) => (
+                    <div key={m.modulo} className="px-3 py-2.5 flex items-start justify-between gap-3">
+                      <span className="text-[11px] font-bold text-slate-800 capitalize">{m.modulo}</span>
+                      <span className="text-[10px] font-semibold text-[#3B42B2] text-right shrink-0">
+                        {m.acoes.join(', ')}
+                      </span>
+                    </div>
+                  ))}
+                {matrizPermissoes.length === 0 && (
+                  <div className="px-3 py-4 text-center text-[11px] text-slate-400 font-semibold">
+                    Carregando permissões...
                   </div>
-                </label>
-              ))}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {erro && (

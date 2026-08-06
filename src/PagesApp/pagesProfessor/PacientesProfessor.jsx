@@ -69,7 +69,7 @@ export default function PacientesProfessor() {
   };
 
   return (
-    <div className="w-full h-full min-h-screen bg-[#3B42B2] text-white flex flex-col justify-between font-sans m-0 p-0 overflow-x-hidden">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#3B42B2] text-white font-sans overflow-x-hidden">
       
       {/* TOPO FIXO / HEADER */}
       <div className="pt-8 pb-4 px-4 flex items-center justify-between shrink-0">

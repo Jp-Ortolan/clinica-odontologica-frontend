@@ -39,7 +39,7 @@ export default function EstoqueProfessor() {
   });
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-white">
+    <div className="flex-1 flex flex-col min-h-0 bg-white">
 
       {/* HEADER FIXO */}
       <header className="bg-[#3B44A8] pt-12 pb-6 px-6 text-white flex items-center justify-between shadow-md rounded-b-[24px] shrink-0 select-none">

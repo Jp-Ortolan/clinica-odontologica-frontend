@@ -200,7 +200,7 @@ export default function DetalhesPacienteProfessor() {
   };
 
   return (
-    <div className={`w-full h-screen ${BRAND_COLOR} text-white flex flex-col font-sans overflow-hidden relative select-none`}>
+    <div className={`flex-1 flex flex-col min-h-0 ${BRAND_COLOR} text-white font-sans overflow-hidden relative select-none`}>
       
       {/* Backdrop transparente para fechar menus suspensos ao clicar fora */}
       {menuAbertoId && (

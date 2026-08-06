@@ -104,7 +104,7 @@ export default function PacotesEsterilizadosProfessor() {
   };
 
   return (
-    <div className="w-full h-full min-h-screen bg-[#3B42B2] text-white flex flex-col font-sans m-0 p-0 overflow-x-hidden">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#3B42B2] text-white font-sans overflow-x-hidden">
 
       {/* HEADER / TOPO */}
       <div className="pt-8 pb-4 px-4 flex items-center justify-between shrink-0">
