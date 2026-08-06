@@ -1,9 +1,12 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // ================= IMPORTS PÚBLICOS =================
 import Login from './Login';
 import RecuperarSenha from './RecuperarSenha';
+import RedefinirSenha from './RedefinirSenha';
 
 // ================= IMPORTS DO ALUNO (MOBILE) =================
 import LayoutAluno from './PagesApp/pagesAlunos/LayoutAluno';
@@ -70,79 +73,103 @@ function SpacerWrapper({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* ROTAS PÚBLICAS */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+          {/* ROTAS PÚBLICAS */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+          <Route path="/redefinir-senha" element={<RedefinirSenha />} />
 
-        {/* ROTAS DO ALUNO */}
-        <Route path="/app/aluno" element={<LayoutAluno />}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardAluno />} />
-          <Route path="agenda" element={<AgendaAluno />} />
-          <Route path="cirurgias" element={<SpacerWrapper><ListaCirurgias /></SpacerWrapper>} />
-          <Route path="cirurgias/detalhes" element={<DetalhesCirurgia />} />
-          <Route path="estoque" element={<EstoqueAluno />} />
-          <Route path="estoque/cadastrar" element={<CadastrarMaterial />} />
-          <Route path="estoque/scanner" element={<LeitorScanner />} />
-          <Route path="estoque/materiais" element={<MateriaisCadastrados />} />
-          <Route path="estoque/detalhes" element={<DetalhesMaterial />} />
-          <Route path="estoque/configurar-etiqueta" element={<ConfigurarEtiqueta />} />
-          <Route path="estoque/pre-visualizacao" element={<PreVisualizacaoEtiqueta />} />
-          <Route path="estoque/impressao-concluida" element={<ConcluirImpressaoEtiqueta />} />
-          <Route path="agenda/detalhes" element={<DetalhesAtendimento />} />
-          <Route path="pacientes/detalhes" element={<DetalhesPacienteAluno />} />
-          <Route path="configuracoes" element={<Configuracoes />} />
-        </Route>
+          {/* ROTAS DO ALUNO */}
+          <Route
+            path="/app/aluno"
+            element={
+              <ProtectedRoute perfisPermitidos={['aluno']}>
+                <LayoutAluno />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardAluno />} />
+            <Route path="agenda" element={<AgendaAluno />} />
+            <Route path="cirurgias" element={<SpacerWrapper><ListaCirurgias /></SpacerWrapper>} />
+            <Route path="cirurgias/detalhes" element={<DetalhesCirurgia />} />
+            <Route path="estoque" element={<EstoqueAluno />} />
+            <Route path="estoque/cadastrar" element={<CadastrarMaterial />} />
+            <Route path="estoque/scanner" element={<LeitorScanner />} />
+            <Route path="estoque/materiais" element={<MateriaisCadastrados />} />
+            <Route path="estoque/detalhes" element={<DetalhesMaterial />} />
+            <Route path="estoque/configurar-etiqueta" element={<ConfigurarEtiqueta />} />
+            <Route path="estoque/pre-visualizacao" element={<PreVisualizacaoEtiqueta />} />
+            <Route path="estoque/impressao-concluida" element={<ConcluirImpressaoEtiqueta />} />
+            <Route path="agenda/detalhes" element={<DetalhesAtendimento />} />
+            <Route path="pacientes/detalhes" element={<DetalhesPacienteAluno />} />
+            <Route path="configuracoes" element={<Configuracoes />} />
+          </Route>
 
-        {/* ROTAS DO PROFESSOR */}
-        <Route path="/app/professor" element={<LayoutProfessor />}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardProfessor />} />
-          <Route path="agenda" element={<AgendaProfessor />} />
-          <Route path="cme" element={<CmeProfessor />} />
-          <Route path="cme/leitor" element={<LeitorCmeProfessor />} />
-          <Route path="cme/pacote-detalhes" element={<DetalhesPacoteCme />} />
-          <Route path="cme/pacotes-esterilizados" element={<PacotesEsterilizadosProfessor />} />
-          <Route path="cme/controle-biologico" element={<ControleBiologicoProfessor />} />
-          <Route path="cirurgias" element={<SpacerWrapper><GerenciadorCirurgias /></SpacerWrapper>} />
-          <Route path="cirurgias/detalhes" element={<SpacerWrapper><DetalhesCirurgiaProfessor /></SpacerWrapper>} />
-          <Route path="mutirao" element={<SpacerWrapper><TelaMutiraoCirurgico /></SpacerWrapper>} />
-          <Route path="pacientes" element={<PacientesProfessor />} />
-          <Route path="pacientes/detalhes" element={<DetalhesPacienteProfessor />} />
-          <Route path="configuracoes" element={<SettingsManager />} />
-          <Route path="configuracoes/novo-usuario" element={<NovoUsuario />} />
+          {/* ROTAS DO PROFESSOR */}
+          <Route
+            path="/app/professor"
+            element={
+              <ProtectedRoute perfisPermitidos={['professor']}>
+                <LayoutProfessor />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardProfessor />} />
+            <Route path="agenda" element={<AgendaProfessor />} />
+            <Route path="cme" element={<CmeProfessor />} />
+            <Route path="cme/leitor" element={<LeitorCmeProfessor />} />
+            <Route path="cme/pacote-detalhes" element={<DetalhesPacoteCme />} />
+            <Route path="cme/pacotes-esterilizados" element={<PacotesEsterilizadosProfessor />} />
+            <Route path="cme/controle-biologico" element={<ControleBiologicoProfessor />} />
+            <Route path="cirurgias" element={<SpacerWrapper><GerenciadorCirurgias /></SpacerWrapper>} />
+            <Route path="cirurgias/detalhes" element={<SpacerWrapper><DetalhesCirurgiaProfessor /></SpacerWrapper>} />
+            <Route path="mutirao" element={<SpacerWrapper><TelaMutiraoCirurgico /></SpacerWrapper>} />
+            <Route path="pacientes" element={<PacientesProfessor />} />
+            <Route path="pacientes/detalhes" element={<DetalhesPacienteProfessor />} />
+            <Route path="configuracoes" element={<SettingsManager />} />
+            <Route path="configuracoes/novo-usuario" element={<NovoUsuario />} />
 
-          {/* ROTAS DO ESTOQUE DO PROFESSOR */}
-          <Route path="estoque" element={<EstoqueProfessor />} />
-          <Route path="estoque/cadastrar" element={<CadastrarMaterialProfessor />} />
-          <Route path="estoque/scanner" element={<LeitorScannerProfessor />} />
-          <Route path="estoque/materiais" element={<MateriaisCadastradosProfessor />} />
-          <Route path="estoque/detalhes" element={<DetalhesMaterialProfessor />} />
-          <Route path="estoque/configurar-etiqueta" element={<ConfigurarEtiquetaProfessor />} />
-          <Route path="estoque/pre-visualizacao" element={<PreVisualizacaoEtiquetaProfessor />} />
-          <Route path="estoque/impressao-concluida" element={<ConcluirImpressaoEtiquetaProfessor />} />
-        </Route>
+            {/* ROTAS DO ESTOQUE DO PROFESSOR */}
+            <Route path="estoque" element={<EstoqueProfessor />} />
+            <Route path="estoque/cadastrar" element={<CadastrarMaterialProfessor />} />
+            <Route path="estoque/scanner" element={<LeitorScannerProfessor />} />
+            <Route path="estoque/materiais" element={<MateriaisCadastradosProfessor />} />
+            <Route path="estoque/detalhes" element={<DetalhesMaterialProfessor />} />
+            <Route path="estoque/configurar-etiqueta" element={<ConfigurarEtiquetaProfessor />} />
+            <Route path="estoque/pre-visualizacao" element={<PreVisualizacaoEtiquetaProfessor />} />
+            <Route path="estoque/impressao-concluida" element={<ConcluirImpressaoEtiquetaProfessor />} />
+          </Route>
 
-        {/* ROTAS DA RECEPÇÃO */}
-        <Route path="/app/recepcao" element={<LayoutRecepcao />}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardRecepcao />} />
-          <Route path="fila-completa" element={<FilaPacientes />} />
-          <Route path="pacientes" element={<PacientesRecepcao />} />
-          <Route path="pacientes/cadastro" element={<CadastroPacienteRecepcao />} />
-          <Route path="pacientes/detalhes" element={<DetalhesPacienteRecepcao />} />
-          <Route path="status-consultas" element={<StatusConsultas />} />
-          <Route path="agenda" element={<AgendaGeral />} />
-          <Route path="agenda/reagendar" element={<ReagendarConsulta />} />
-          <Route path="agenda/cancelar" element={<CancelarConsulta />} />
-          <Route path="agenda/novo-agendamento" element={<AgendarConsulta />} />
-        </Route>
+          {/* ROTAS DA RECEPÇÃO */}
+          <Route
+            path="/app/recepcao"
+            element={
+              <ProtectedRoute perfisPermitidos={['recepcionista']}>
+                <LayoutRecepcao />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardRecepcao />} />
+            <Route path="fila-completa" element={<FilaPacientes />} />
+            <Route path="pacientes" element={<PacientesRecepcao />} />
+            <Route path="pacientes/cadastro" element={<CadastroPacienteRecepcao />} />
+            <Route path="pacientes/detalhes" element={<DetalhesPacienteRecepcao />} />
+            <Route path="status-consultas" element={<StatusConsultas />} />
+            <Route path="agenda" element={<AgendaGeral />} />
+            <Route path="agenda/reagendar" element={<ReagendarConsulta />} />
+            <Route path="agenda/cancelar" element={<CancelarConsulta />} />
+            <Route path="agenda/novo-agendamento" element={<AgendarConsulta />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

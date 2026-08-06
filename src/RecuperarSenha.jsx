@@ -18,9 +18,18 @@ export default function RecuperarSenha() {
 
     try {
       // Envia a solicitação de recuperação para a API no Railway
-      await api.post('/auth/recuperar-senha', { email });
+      const resposta = await api.post('/auth/recuperar-senha', { email });
 
-      setMensagemSucesso('Instruções enviadas! Verifique sua caixa de entrada.');
+      // Projeto acadêmico sem servidor de e-mail: o backend devolve o
+      // token direto na resposta. Levamos o usuário já pra tela de
+      // redefinir senha, com o token preenchido.
+      const token = resposta.data?.reset_token;
+      if (token) {
+        navigate('/redefinir-senha', { state: { token } });
+        return;
+      }
+
+      setMensagemSucesso('Se o e-mail existir, um link de recuperação foi gerado.');
       setEmail('');
     } catch (err) {
       console.error('Erro na recuperação de senha:', err);
