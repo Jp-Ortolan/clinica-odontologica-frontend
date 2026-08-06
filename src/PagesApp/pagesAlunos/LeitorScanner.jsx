@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, History, Keyboard, Barcode, X, Search } from 'lucide-react';
+import api from '../../Services/api';
 
 export default function LeitorScanner() {
   const navigate = useNavigate();
@@ -10,6 +11,8 @@ export default function LeitorScanner() {
   const [abaAtiva, setAbaAtiva] = useState('qrcode');
   const [modalDigitarAberto, setModalDigitarAberto] = useState(false);
   const [codigoDigitado, setCodigoDigitado] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [erroBusca, setErroBusca] = useState('');
 
   useEffect(() => {
     if (location.state?.modo) {
@@ -17,25 +20,31 @@ export default function LeitorScanner() {
     }
   }, [location.state]);
 
-  const handleBuscarManual = (e) => {
+  // Não há câmera real integrada — a leitura de fato acontece digitando
+  // o código, que buscamos direto no material real via /materiais?busca=
+  const handleBuscarManual = async (e) => {
     e.preventDefault();
     if (!codigoDigitado.trim()) return;
-    
-    // Simula a busca do material pelo código digitado
-    setModalDigitarAberto(false);
-    navigate('/app/aluno/estoque/detalhes', { 
-      state: { 
-        material: {
-          nome: "Kit Cirúrgico Encontrado",
-          codigo: codigoDigitado,
-          embalagem: "(1 Un)",
-          lote: "2026-04-15",
-          val: "15/04/2030",
-          qtd: 10,
-          imagem: "https://placehold.co/100x100/e2e8f0/475569?text=Kit"
-        } 
-      } 
-    });
+
+    setBuscando(true);
+    setErroBusca('');
+    try {
+      const resposta = await api.get('/materiais', { params: { busca: codigoDigitado.trim() } });
+      const encontrado = resposta.data.find((m) => m.codigo_barras === codigoDigitado.trim()) || resposta.data[0];
+
+      if (!encontrado) {
+        setErroBusca('Nenhum material encontrado com esse código.');
+        return;
+      }
+
+      setModalDigitarAberto(false);
+      navigate('/app/aluno/estoque/detalhes', { state: { material: encontrado } });
+    } catch (err) {
+      console.error('Erro ao buscar material:', err);
+      setErroBusca('Erro ao buscar material.');
+    } finally {
+      setBuscando(false);
+    }
   };
 
   return (
@@ -123,11 +132,11 @@ export default function LeitorScanner() {
           {/* Botão Histórico */}
           <button
             type="button"
-            onClick={() => navigate('/app/aluno/estoque/historico')}
+            onClick={() => navigate('/app/aluno/estoque/materiais')}
             className="flex items-center justify-center gap-2 py-3.5 px-4 bg-white border border-gray-200 hover:bg-gray-50 active:scale-95 rounded-xl font-bold text-[#3B44A8] text-xs shadow-xs transition-all cursor-pointer"
           >
             <History size={16} />
-            Histórico
+            Materiais
           </button>
 
           {/* Botão Digitar Código */}
@@ -180,6 +189,7 @@ export default function LeitorScanner() {
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#3B44A8] text-gray-800"
                   autoFocus
                 />
+                {erroBusca && <p className="text-red-500 text-[10px] font-bold mt-1.5">{erroBusca}</p>}
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -192,11 +202,11 @@ export default function LeitorScanner() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!codigoDigitado.trim()}
+                  disabled={!codigoDigitado.trim() || buscando}
                   className="flex-1 py-3 text-xs font-bold text-white bg-[#3B44A8] hover:bg-[#2E3583] disabled:opacity-50 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Search size={14} />
-                  Buscar
+                  {buscando ? 'Buscando...' : 'Buscar'}
                 </button>
               </div>
             </form>

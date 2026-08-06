@@ -1,14 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  ChevronDown, 
-  Calendar, 
-  Image, 
-  Barcode, 
-  X, 
-  Loader2, 
-  AlertCircle 
+import {
+  ArrowLeft,
+  ChevronDown,
+  Calendar,
+  Image,
+  Barcode,
+  X,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import api from '../../Services/api';
 
@@ -20,12 +20,21 @@ export default function CadastrarMaterial() {
   const [nome, setNome] = useState('');
   const [codigoBarras, setCodigoBarras] = useState('');
   const [categoria, setCategoria] = useState('');
+  const [categorias, setCategorias] = useState([]);
   const [unidade, setUnidade] = useState('');
   const [estoqueMinimo, setEstoqueMinimo] = useState('');
   const [estoqueIdeal, setEstoqueIdeal] = useState('');
   const [descricao, setDescricao] = useState('');
   const [fabricante, setFabricante] = useState('');
   const [validade, setValidade] = useState('');
+
+  // O backend exige um categoria_id real (FK) — carrega as categorias
+  // já cadastradas para popular o seletor.
+  useEffect(() => {
+    api.get('/categorias')
+      .then((res) => setCategorias(res.data))
+      .catch((err) => console.error('Erro ao carregar categorias:', err));
+  }, []);
 
   // Estados de Imagem / Arquivo
   const [arquivo, setArquivo] = useState(null);
@@ -75,28 +84,20 @@ export default function CadastrarMaterial() {
     setSalvando(true);
 
     try {
-      // Monta o objeto FormData para permitir envio multipart (caso haja imagem)
-      const formData = new FormData();
-      formData.append('nome', nome);
-      formData.append('codigoBarras', codigoBarras);
-      formData.append('categoria', categoria);
-      formData.append('unidade', unidade);
-      formData.append('estoqueMinimo', estoqueMinimo);
-      formData.append('estoqueIdeal', estoqueIdeal);
-      formData.append('descricao', descricao);
-      formData.append('fabricante', fabricante);
-      formData.append('validade', validade);
+      // O backend de materiais não aceita upload de arquivo/imagem —
+      // só os campos cadastrais mesmo.
+      const payload = {
+        nome,
+        codigo_barras: codigoBarras,
+        categoria_id: Number(categoria),
+        unidade_medida: unidade,
+        estoque_minimo: Number(estoqueMinimo),
+        estoque_ideal: estoqueIdeal ? Number(estoqueIdeal) : null,
+        fabricante: fabricante || undefined,
+        validade: validade || undefined,
+      };
 
-      if (arquivo) {
-        formData.append('imagem', arquivo);
-      }
-
-      // Envia os dados para a API
-      await api.post('/materiais', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.post('/materiais', payload);
 
       // Redireciona após salvar com sucesso
       navigate('/app/aluno/estoque');
@@ -185,12 +186,9 @@ export default function CadastrarMaterial() {
                 required
               >
                 <option value="">Selecione</option>
-                <option value="cirurgia">Cirurgia</option>
-                <option value="dentistica">Dentística</option>
-                <option value="periodontia">Periodontia</option>
-                <option value="endodontia">Endodontia</option>
-                <option value="ortodontia">Ortodontia</option>
-                <option value="protese">Prótese</option>
+                {categorias.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                ))}
               </select>
               <ChevronDown className="absolute right-4 top-3.5 text-gray-400 pointer-events-none" size={16} />
             </div>

@@ -1,81 +1,21 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Info } from 'lucide-react';
+import { ArrowLeft, Info, Package } from 'lucide-react';
+import api from '../../Services/api';
 
 export default function MateriaisCadastrados() {
   const navigate = useNavigate();
+  const [materiaisOrdenados, setMateriaisOrdenados] = useState([]);
+  const [carregando, setCarregando] = useState(true);
 
-  const materiaisBase = [
-    {
-      id: 1,
-      nome: "Kit Cirúrgico 01",
-      codigo: "125794216646",
-      lote: "2026-04-15",
-      val: "15/04/2030",
-      quantidade: "30 unidades",
-      qtd: 30,
-      status: "Estocado",
-      responsavel: "Pedro Guimarães",
-      dataHora: "15/05/2026 às 11:37",
-      imagem: "https://placehold.co/100x100/e2e8f0/475569?text=Kit"
-    },
-    {
-      id: 2,
-      nome: "Luva Descartável",
-      codigo: "36589103001645354",
-      lote: "2026-02-07",
-      val: "06/09/3034",
-      quantidade: "81 unidades",
-      qtd: 81,
-      status: "Estocado",
-      responsavel: "Rhaya Borges",
-      dataHora: "10/06/2026 às 14:20",
-      imagem: "https://placehold.co/100x100/e2e8f0/475569?text=Luva"
-    },
-    {
-      id: 3,
-      nome: "Seringa Carpule",
-      codigo: "859648430000545",
-      lote: "2026-05-02",
-      val: "Indeterminado",
-      quantidade: "25 unidades",
-      qtd: 25,
-      status: "Estocado",
-      responsavel: "Helena Amaral",
-      dataHora: "02/05/2026 às 09:51",
-      imagem: "https://placehold.co/100x100/e2e8f0/475569?text=Seringa"
-    },
-    {
-      id: 4,
-      nome: "Gaze",
-      codigo: "18279813055465",
-      lote: "2026-01-31",
-      val: "20/07/2029",
-      quantidade: "100 unidades",
-      qtd: 100,
-      status: "Estocado",
-      responsavel: "Carlos Lima",
-      dataHora: "18/04/2026 às 08:15",
-      imagem: "https://placehold.co/100x100/e2e8f0/475569?text=Gaze"
-    },
-    {
-      id: 5,
-      nome: "Gorro Descartável",
-      codigo: "423254345435",
-      lote: "2026-05-02",
-      val: "20/08/2029",
-      quantidade: "10 unidades",
-      qtd: 10,
-      observacoes: "Cada pacote tem 100 gorros.",
-      status: "Estocado",
-      responsavel: "Helena Amaral",
-      dataHora: "02/05/2026 às 09:43",
-      imagem: "https://placehold.co/100x100/e2e8f0/475569?text=Gorro"
-    }
-  ];
-
-  const materiaisOrdenados = [...materiaisBase].sort((a, b) => 
-    a.nome.localeCompare(b.nome)
-  );
+  useEffect(() => {
+    api.get('/materiais')
+      .then((res) => {
+        setMateriaisOrdenados([...res.data].sort((a, b) => a.nome.localeCompare(b.nome)));
+      })
+      .catch((err) => console.error('Erro ao carregar materiais:', err))
+      .finally(() => setCarregando(false));
+  }, []);
 
   const handleSelecionarMaterial = (material) => {
     navigate('/app/aluno/estoque/configurar-etiqueta', { state: { material } });
@@ -117,51 +57,52 @@ export default function MateriaisCadastrados() {
           </h2>
 
           <div className="space-y-4" role="list">
-            {materiaisOrdenados.map((item) => (
-              <div
-                key={item.id}
-                role="listitem"
-                tabIndex={0}
-                onClick={() => handleSelecionarMaterial(item)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleSelecionarMaterial(item);
-                  }
-                }}
-                className="bg-white border border-gray-150 rounded-2xl p-4 shadow-xs flex gap-4 hover:border-gray-300 transition active:scale-[0.99] cursor-pointer relative focus:outline-none focus:ring-2 focus:ring-[#3B44A8]"
-              >
-                <img 
-                  src={item.imagem} 
-                  alt={`Imagem ilustrativa do material ${item.nome}`}
-                  className="w-16 h-16 rounded-xl object-cover border border-gray-150 bg-gray-50 shrink-0 select-none"
-                />
-
-                <div className="flex-1 min-w-0 text-[10px] text-gray-500 font-semibold space-y-0.5">
-                  <h3 className="text-gray-900 font-bold text-sm leading-tight mb-1 truncate">
-                    {item.nome}
-                  </h3>
-                  <p className="truncate"><span className="text-gray-900 font-bold">Código:</span> {item.codigo}</p>
-                  <p className="truncate"><span className="text-gray-900 font-bold">Lote:</span> {item.lote}</p>
-                  <p className="truncate"><span className="text-gray-900 font-bold">Val:</span> {item.val}</p>
-                  <p className="truncate"><span className="text-gray-900 font-bold">Quantidade:</span> {item.quantidade}</p>
-                  {item.observacoes && (
-                    <p className="truncate"><span className="text-gray-900 font-bold">Observações:</span> {item.observacoes}</p>
-                  )}
-                </div>
-
-                <div className="flex flex-col justify-between items-end shrink-0 select-none">
-                  <span className="bg-[#C1E7C4] text-[#2E7D32] font-bold text-[9px] px-3 py-1 rounded-full">
-                    {item.status}
-                  </span>
-                  <div className="text-right text-[8px] text-gray-400 font-medium leading-tight">
-                    <p className="font-semibold">{item.responsavel}</p>
-                    <p>{item.dataHora}</p>
+            {carregando ? (
+              <div className="p-6 text-center text-gray-400 text-xs">Carregando materiais...</div>
+            ) : materiaisOrdenados.length === 0 ? (
+              <div className="p-6 text-center text-gray-400 text-xs">Nenhum material cadastrado ainda.</div>
+            ) : (
+              materiaisOrdenados.map((item) => (
+                <div
+                  key={item.id}
+                  role="listitem"
+                  tabIndex={0}
+                  onClick={() => handleSelecionarMaterial(item)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelecionarMaterial(item);
+                    }
+                  }}
+                  className="bg-white border border-gray-150 rounded-2xl p-4 shadow-xs flex gap-4 hover:border-gray-300 transition active:scale-[0.99] cursor-pointer relative focus:outline-none focus:ring-2 focus:ring-[#3B44A8]"
+                >
+                  <div className="w-16 h-16 rounded-xl border border-gray-150 bg-gray-50 shrink-0 select-none flex items-center justify-center text-gray-400">
+                    <Package size={24} />
                   </div>
-                </div>
 
-              </div>
-            ))}
+                  <div className="flex-1 min-w-0 text-[10px] text-gray-500 font-semibold space-y-0.5">
+                    <h3 className="text-gray-900 font-bold text-sm leading-tight mb-1 truncate">
+                      {item.nome}
+                    </h3>
+                    <p className="truncate"><span className="text-gray-900 font-bold">Código:</span> {item.codigo_barras}</p>
+                    <p className="truncate"><span className="text-gray-900 font-bold">Lote:</span> {item.lote || 'N/I'}</p>
+                    <p className="truncate"><span className="text-gray-900 font-bold">Val:</span> {item.validade ? new Date(item.validade).toLocaleDateString('pt-BR') : 'Indeterminado'}</p>
+                    <p className="truncate"><span className="text-gray-900 font-bold">Quantidade:</span> {item.quantidade} {item.unidade_medida}</p>
+                  </div>
+
+                  <div className="flex flex-col justify-between items-end shrink-0 select-none">
+                    <span className={`font-bold text-[9px] px-3 py-1 rounded-full ${
+                      item.status_estoque === 'Crítico' ? 'bg-red-100 text-red-700' :
+                      item.status_estoque === 'Baixo' ? 'bg-amber-100 text-amber-700' :
+                      'bg-[#C1E7C4] text-[#2E7D32]'
+                    }`}>
+                      {item.status_estoque}
+                    </span>
+                  </div>
+
+                </div>
+              ))
+            )}
           </div>
         </div>
 

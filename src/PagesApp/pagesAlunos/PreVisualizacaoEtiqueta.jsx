@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Minus, Plus, Printer } from 'lucide-react';
+import api from '../../Services/api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function PreVisualizacaoEtiqueta() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { usuario } = useAuth();
 
   const dados = location.state || {
-    material: { nome: 'GAZE', codigo: '18279813055465' },
+    material: { nome: 'GAZE', codigo_barras: '18279813055465' },
     lote: '2026-01-31',
     validade: '20/07/2029',
     quantidade: 10,
@@ -18,6 +21,16 @@ export default function PreVisualizacaoEtiqueta() {
   };
 
   const [qtdEtiquetas, setQtdEtiquetas] = useState(dados.quantidade);
+  const [qrCodeReal, setQrCodeReal] = useState('');
+
+  // Busca o QR code real gerado pelo backend para este material
+  useEffect(() => {
+    if (dados.material?.id) {
+      api.get(`/materiais/${dados.material.id}/qrcode`)
+        .then((res) => setQrCodeReal(res.data.qr_code))
+        .catch((err) => console.error('Erro ao gerar QR code:', err));
+    }
+  }, [dados.material?.id]);
 
   // =========================================================================
   // GERADOR DE QR CODE EM SVG
@@ -136,7 +149,7 @@ export default function PreVisualizacaoEtiqueta() {
         validade: dados.validade,
         quantidadeImpressa: qtdEtiquetas,
         dataHora: dataHoraFormatada,
-        usuario: "Pedro Guimarães"
+        usuario: usuario?.nome || 'Usuário'
       }
     });
   };
@@ -180,17 +193,21 @@ export default function PreVisualizacaoEtiqueta() {
               <div className="flex items-center justify-between gap-4 py-3 px-1">
                 {dados.incluirQR && (
                   <div className="w-16 h-16 bg-white flex items-center justify-center shrink-0 p-0.5 border border-gray-100 rounded-md shadow-inner">
-                    {gerarQRCodeSVG(dados.material?.nome + dados.material?.codigo)}
+                    {qrCodeReal ? (
+                      <img src={qrCodeReal} alt="QR Code do material" className="w-full h-full object-contain" />
+                    ) : (
+                      gerarQRCodeSVG(dados.material?.nome + dados.material?.codigo_barras)
+                    )}
                   </div>
                 )}
 
                 {dados.incluirBarra && (
                   <div className="flex flex-col items-center flex-1 min-w-0">
                     <div className="w-full px-1">
-                      {gerarCodigoDeBarrasSVG(dados.material?.codigo)}
+                      {gerarCodigoDeBarrasSVG(dados.material?.codigo_barras)}
                     </div>
                     <span className="text-[10px] font-bold text-gray-950 mt-1 tracking-widest truncate w-full text-center">
-                      {dados.material?.codigo}
+                      {dados.material?.codigo_barras}
                     </span>
                   </div>
                 )}

@@ -1,32 +1,48 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  User, 
-  Package, 
-  Layers, 
-  Sparkles, 
-  FileText, 
-  Plus, 
-  Minus 
+import {
+  ArrowLeft,
+  User,
+  Package,
+  Layers,
+  Sparkles,
+  FileText,
+  Plus,
+  Minus
 } from 'lucide-react';
+import api from '../../Services/api';
 
 export default function DetalhesCirurgia() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Dados com fallback para testes ou navegação direta
-  const cirurgia = location.state?.cirurgia || {
-    paciente: "Rhaya Borges",
-    cpf: "012.123.456-89",
-    procedimento: "Exodontia - 36",
-    data: "26/05/2026",
-    horario: "08:30",
-    local: "Centro Cirúrgico",
-    status: "Agendada"
+  // Linha crua vinda do backend (id, paciente_id, usuario_id, data_hora,
+  // tipo_cirurgia, status, observacoes, mutirao_id)
+  const cirurgiaRaw = location.state?.cirurgia || {};
+  const [paciente, setPaciente] = useState(null);
+  const [equipe, setEquipe] = useState([]);
+
+  useEffect(() => {
+    if (cirurgiaRaw.paciente_id) {
+      api.get(`/pacientes/${cirurgiaRaw.paciente_id}`).then((res) => setPaciente(res.data)).catch((err) => console.error(err));
+    }
+    if (cirurgiaRaw.id) {
+      api.get(`/cirurgias/${cirurgiaRaw.id}/alunos`).then((res) => setEquipe(res.data)).catch((err) => console.error(err));
+    }
+  }, [cirurgiaRaw.id, cirurgiaRaw.paciente_id]);
+
+  const dataHoraObj = cirurgiaRaw.data_hora ? new Date(cirurgiaRaw.data_hora) : null;
+  const cirurgia = {
+    paciente: paciente?.nome || 'Carregando...',
+    cpf: paciente?.cpf || '',
+    procedimento: cirurgiaRaw.tipo_cirurgia || 'Cirurgia',
+    data: dataHoraObj ? dataHoraObj.toLocaleDateString('pt-BR') : '-',
+    horario: dataHoraObj ? dataHoraObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-',
+    status: cirurgiaRaw.status || 'agendada',
   };
 
-  // Estado para controlar as quantidades interativas dos materiais médicos
+  // O backend não vincula materiais a cirurgias — esta lista fica só
+  // local, como um checklist de apoio para o aluno em sala.
   const [materiais, setMateriais] = useState([
     { id: 1, nome: "Kit Cirúrgico 01", sub: "(1 Un)", qtd: 1, icon: Package },
     { id: 2, nome: "Seringa Carpule", sub: "(1 Un)", qtd: 1, icon: FileText },
@@ -37,7 +53,7 @@ export default function DetalhesCirurgia() {
   ]);
 
   const alterarQuantidade = (id, delta) => {
-    setMateriais(prev => 
+    setMateriais(prev =>
       prev.map(item => {
         if (item.id === id) {
           const novaQtd = Math.max(0, item.qtd + delta);
@@ -98,80 +114,41 @@ export default function DetalhesCirurgia() {
             </div>
           </div>
 
-          <div className="pt-1">
-            <span className="block text-gray-950 font-black text-[10px] uppercase tracking-wider">Local</span>
-            <span className="text-gray-500 font-medium text-[11px] block mt-0.5">{cirurgia.local}</span>
-          </div>
+          {cirurgiaRaw.observacoes && (
+            <div className="pt-1">
+              <span className="block text-gray-950 font-black text-[10px] uppercase tracking-wider">Observações</span>
+              <span className="text-gray-500 font-medium text-[11px] block mt-0.5">{cirurgiaRaw.observacoes}</span>
+            </div>
+          )}
         </div>
 
         {/* 2. EQUIPE RESPONSÁVEL */}
         <div className="space-y-2.5">
           <h3 className="text-[#3B44A8] font-black text-xs px-1">Equipe responsável</h3>
-          
+
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs divide-y divide-gray-100">
-            {/* Responsável */}
-            <div className="p-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-gray-50 rounded-full border border-gray-200 flex items-center justify-center shrink-0">
-                  <User size={18} className="text-gray-400" />
+            {equipe.length === 0 ? (
+              <div className="p-4 text-center text-gray-400 text-[11px]">Nenhum vínculo de equipe cadastrado.</div>
+            ) : (
+              equipe.map((membro) => (
+                <div key={membro.id} className="p-3.5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-gray-50 rounded-full border border-gray-200 flex items-center justify-center shrink-0">
+                      <User size={18} className="text-gray-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-950 text-xs">{membro.usuario_nome || `Aluno #${membro.usuario_id}`}</h4>
+                      <p className="text-gray-400 text-[10px] font-medium leading-none mt-0.5">{membro.curso || 'Aluno'}</p>
+                    </div>
+                  </div>
+                  <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full capitalize ${
+                    membro.papel === 'executante' ? 'bg-[#DCE0F5] text-[#3B44A8]' : 'bg-[#FFEED2] text-[#B45309]'
+                  }`}>
+                    {membro.papel}
+                  </span>
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-950 text-xs">João Silva</h4>
-                  <p className="text-gray-400 text-[10px] font-medium leading-none mt-0.5">Aluno</p>
-                </div>
-              </div>
-              <span className="bg-[#DCE0F5] text-[#3B44A8] text-[9px] font-bold px-2.5 py-1 rounded-full">
-                Responsável
-              </span>
-            </div>
-
-            {/* Auxiliar 1 */}
-            <div className="p-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-gray-50 rounded-full border border-gray-200 flex items-center justify-center shrink-0">
-                  <User size={18} className="text-gray-400" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-950 text-xs">Matheus Mota</h4>
-                  <p className="text-gray-400 text-[10px] font-medium leading-none mt-0.5">Aluno</p>
-                </div>
-              </div>
-              <span className="bg-[#FFEED2] text-[#B45309] text-[9px] font-bold px-2.5 py-1 rounded-full">
-                Auxiliar
-              </span>
-            </div>
-
-            {/* Auxiliar 2 */}
-            <div className="p-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-gray-50 rounded-full border border-gray-200 flex items-center justify-center shrink-0">
-                  <User size={18} className="text-gray-400" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-950 text-xs">Alana Lopes</h4>
-                  <p className="text-gray-400 text-[10px] font-medium leading-none mt-0.5">Aluno</p>
-                </div>
-              </div>
-              <span className="bg-[#FFEED2] text-[#B45309] text-[9px] font-bold px-2.5 py-1 rounded-full">
-                Auxiliar
-              </span>
-            </div>
-
-            {/* Supervisor */}
-            <div className="p-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-gray-50 rounded-full border border-gray-200 flex items-center justify-center shrink-0">
-                  <User size={18} className="text-gray-400" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-950 text-xs">Dr. Carlos Eduardo</h4>
-                  <p className="text-gray-400 text-[10px] font-medium leading-none mt-0.5">Professor</p>
-                </div>
-              </div>
-              <span className="bg-[#DEF5E9] text-[#0f5132] text-[9px] font-bold px-2.5 py-1 rounded-full">
-                Supervisor
-              </span>
-            </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -235,8 +212,8 @@ export default function DetalhesCirurgia() {
         >
           Voltar
         </button>
-        <button 
-          onClick={() => alert('Lista de materiais cirúrgicos salva!')}
+        <button
+          onClick={() => alert('Checklist salvo localmente nesta tela.')}
           className="flex-1 py-3 bg-[#3B44A8] text-white rounded-xl font-bold text-xs hover:bg-[#30388d] transition active:scale-[0.98] shadow-sm cursor-pointer"
         >
           Salvar Materiais

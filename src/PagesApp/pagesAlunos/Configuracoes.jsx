@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, LogOut } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Configuracoes() {
   const navigate = useNavigate();
+  const { usuario, logout } = useAuth();
   const [showModal, setShowModal] = useState(false);
 
   const handleLogout = () => {
-    // Limpa tokens se necessário
+    logout();
     navigate('/login');
   };
 
@@ -42,8 +44,8 @@ export default function Configuracoes() {
           </div>
           
           <div>
-            <h3 className="font-extrabold text-gray-950 text-base leading-tight">Rhaya Borges</h3>
-            <p className="text-gray-500 text-xs font-semibold">Aluno</p>
+            <h3 className="font-extrabold text-gray-950 text-base leading-tight">{usuario?.nome || 'Aluno'}</h3>
+            <p className="text-gray-500 text-xs font-semibold capitalize">{usuario?.perfil || 'Aluno'}</p>
           </div>
         </div>
 

@@ -1,12 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, MapPin, ChevronRight, Info } from 'lucide-react';
+import api from '../../Services/api';
 
 export default function ListaCirurgias() {
   const navigate = useNavigate();
 
   // Data atual do sistema
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
+  const [cirurgias, setCirurgias] = useState([]);
+  const [pacientesPorId, setPacientesPorId] = useState({});
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/cirurgias'),
+      api.get('/pacientes'),
+    ]).then(([cirurgiasRes, pacientesRes]) => {
+      const nomePorId = {};
+      pacientesRes.data.forEach((p) => { nomePorId[p.id] = p.nome; });
+      setPacientesPorId(nomePorId);
+      setCirurgias(cirurgiasRes.data);
+    }).catch((err) => console.error('Erro ao carregar cirurgias:', err));
+  }, []);
 
   // Formata para "Hoje, DD de Mês de AAAA" ou "DD de Mês de AAAA"
   const formatarDataExtenso = (date) => {
@@ -47,26 +62,24 @@ export default function ListaCirurgias() {
     }
   };
 
-  const cirurgiasHoje = [
-    {
-      id: 1,
-      horario: "08:30",
-      paciente: "Rhaya Borges",
-      procedimento: "Exodontia - 36",
-      professor: "Prof. Dr. Carlos Eduardo",
-      local: "Centro Cirúrgico",
-      status: "Confirmada"
-    },
-    {
-      id: 2,
-      horario: "15:30",
-      paciente: "Nome do paciente",
-      procedimento: "Extração de siso",
-      professor: "Prof. Dra. Ana Maria",
-      local: "Centro Cirúrgico",
-      status: "Pendente"
-    }
-  ];
+  const cirurgiasDoDia = cirurgias
+    .filter((c) => {
+      const d = new Date(c.data_hora);
+      return d.getDate() === dataSelecionada.getDate() &&
+        d.getMonth() === dataSelecionada.getMonth() &&
+        d.getFullYear() === dataSelecionada.getFullYear();
+    })
+    .map((c) => ({
+      id: c.id,
+      horario: new Date(c.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      paciente: pacientesPorId[c.paciente_id] || 'Paciente',
+      procedimento: c.tipo_cirurgia || 'Cirurgia',
+      status: c.status === 'agendada' ? 'Confirmada' : c.status === 'realizada' ? 'Concluída' : 'Cancelada',
+      dadosOriginais: c,
+    }));
+
+  const totalConcluidas = cirurgiasDoDia.filter((c) => c.status === 'Concluída').length;
+  const totalPendentes = cirurgiasDoDia.filter((c) => c.status === 'Confirmada').length;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-white font-sans">
@@ -119,27 +132,30 @@ export default function ListaCirurgias() {
         <div className="grid grid-cols-3 gap-2 select-none pt-1">
           <div className="bg-white border border-gray-150 rounded-2xl p-2.5 text-center shadow-xs">
             <span className="block text-gray-900 font-extrabold text-[9px] sm:text-[10px] leading-tight truncate">Cirurgias do dia</span>
-            <span className="block text-2xl font-extrabold text-[#3B44A8] my-0.5">2</span>
-            <span className="block text-[8px] sm:text-[9px] font-semibold text-gray-800">Confirmadas</span>
+            <span className="block text-2xl font-extrabold text-[#3B44A8] my-0.5">{cirurgiasDoDia.length}</span>
+            <span className="block text-[8px] sm:text-[9px] font-semibold text-gray-800">Total</span>
           </div>
           <div className="bg-white border border-gray-150 rounded-2xl p-2.5 text-center shadow-xs">
             <span className="block text-gray-900 font-extrabold text-[9px] sm:text-[10px] leading-tight truncate">Concluídas</span>
-            <span className="block text-2xl font-extrabold text-[#3B44A8] my-0.5">0</span>
+            <span className="block text-2xl font-extrabold text-[#3B44A8] my-0.5">{totalConcluidas}</span>
             <span className="block text-[8px] sm:text-[9px] font-semibold text-gray-400">-</span>
           </div>
           <div className="bg-white border border-gray-150 rounded-2xl p-2.5 text-center shadow-xs">
             <span className="block text-gray-900 font-extrabold text-[9px] sm:text-[10px] leading-tight truncate">Pendentes</span>
-            <span className="block text-2xl font-extrabold text-[#3B44A8] my-0.5">1</span>
+            <span className="block text-2xl font-extrabold text-[#3B44A8] my-0.5">{totalPendentes}</span>
             <span className="block text-[8px] sm:text-[9px] font-semibold text-gray-400">-</span>
           </div>
         </div>
 
         {/* LISTA DAS CIRURGIAS */}
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs divide-y divide-gray-100 mt-2">
-          {cirurgiasHoje.map((cirurgia) => (
-            <div 
-              key={cirurgia.id} 
-              onClick={() => navigate('/app/aluno/cirurgias/detalhes', { state: { cirurgia } })}
+          {cirurgiasDoDia.length === 0 && (
+            <div className="p-6 text-center text-gray-400 text-xs">Nenhuma cirurgia nesta data.</div>
+          )}
+          {cirurgiasDoDia.map((cirurgia) => (
+            <div
+              key={cirurgia.id}
+              onClick={() => navigate('/app/aluno/cirurgias/detalhes', { state: { cirurgia: cirurgia.dadosOriginais } })}
               className="p-4 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer select-none active:bg-gray-100"
             >
               <div className="text-gray-500 font-medium text-xs w-10 pr-1 text-center shrink-0">
@@ -169,13 +185,6 @@ export default function ListaCirurgias() {
                   <p className="text-[#3B44A8] text-[11px] font-semibold truncate">
                     {cirurgia.procedimento}
                   </p>
-                  <p className="text-gray-500 text-[9px] font-medium leading-none mt-0.5 truncate">
-                    {cirurgia.professor}
-                  </p>
-                  <div className="flex items-center gap-1 text-[8px] text-gray-400 font-semibold mt-1">
-                    <MapPin size={8} className="text-gray-400 shrink-0" />
-                    <span className="truncate">{cirurgia.local}</span>
-                  </div>
                 </div>
               </div>
               

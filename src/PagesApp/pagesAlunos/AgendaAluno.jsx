@@ -50,46 +50,38 @@ export default function AgendaAluno() {
     return `${ano}-${mes}-${dia}`;
   };
 
-  // Busca os agendamentos da API filtrados pela data selecionada
+  // O backend não filtra por data nem tem conceito de "disciplina" nas
+  // consultas — buscamos tudo e filtramos aqui pelo dia selecionado.
   const carregarAgendamentos = useCallback(async () => {
     try {
       setCarregando(true);
       setErro('');
       const dataFormatada = formatarDataIso(dataSelecionada);
 
-      // Chamada API (Ajuste o endpoint se necessário, ex: /agendamentos/aluno ou com params)
-      const resposta = await api.get('/agendamentos', {
-        params: { data: dataFormatada }
-      });
+      const [consultasRes, pacientesRes] = await Promise.all([
+        api.get('/consultas'),
+        api.get('/pacientes'),
+      ]);
 
-      const dados = resposta.data || [];
+      const nomePorPacienteId = {};
+      pacientesRes.data.forEach((p) => { nomePorPacienteId[p.id] = p.nome; });
 
-      // Se a API retornar a lista crua de agendamentos, agrupamos por disciplina
-      if (Array.isArray(dados)) {
-        const agrupado = dados.reduce((acc, item) => {
-          const nomeDisciplina = item.disciplina || item.disciplinaNome || 'Geral';
-          let grupo = acc.find((g) => g.disciplina === nomeDisciplina);
+      const doDia = consultasRes.data.filter(
+        (c) => formatarDataIso(new Date(c.data_hora)) === dataFormatada
+      );
 
-          if (!grupo) {
-            grupo = { disciplina: nomeDisciplina, pacientes: [] };
-            acc.push(grupo);
-          }
+      const grupo = {
+        disciplina: 'Geral',
+        pacientes: doDia.map((item) => ({
+          id: item.id,
+          hora: new Date(item.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          nome: nomePorPacienteId[item.paciente_id] || 'Paciente sem nome',
+          procedimento: item.queixa_principal || 'Consulta',
+          dadosOriginais: item
+        }))
+      };
 
-          grupo.pacientes.push({
-            id: item.id || item._id,
-            hora: item.hora || item.horario || '00:00',
-            nome: item.pacienteNome || item.paciente?.nome || 'Paciente sem nome',
-            procedimento: item.procedimento || item.tipoProcedimento || 'Consulta',
-            dadosOriginais: item
-          });
-
-          return acc;
-        }, []);
-
-        setAgendamentos(agrupado);
-      } else {
-        setAgendamentos([]);
-      }
+      setAgendamentos([grupo]);
     } catch (err) {
       console.error('Erro ao buscar agendamentos:', err);
       setErro('Falha ao carregar agendamentos do dia.');

@@ -18,7 +18,7 @@ export default function ConfigurarEtiqueta() {
 
   // Estados com os dados iniciais do material herdado
   const [lote, setLote] = useState(material.lote || '');
-  const [validade, setValidade] = useState(material.val || '');
+  const [validade, setValidade] = useState(material.validade ? new Date(material.validade).toLocaleDateString('pt-BR') : '');
   const [quantidade, setQuantidade] = useState(10);
   const [localizacao, setLocalizacao] = useState('Centro Universitário Campo Real Guarapuava');
   const [incluirQR, setIncluirQR] = useState(true);
@@ -62,21 +62,13 @@ export default function ConfigurarEtiqueta() {
         <div className="space-y-2">
           <h2 className="text-[#3B44A8] font-bold text-sm tracking-wide px-1">Material selecionado</h2>
           <div className="bg-white border border-gray-150 rounded-2xl p-4 shadow-sm flex gap-4 items-center">
-            {material.imagem ? (
-              <img 
-                src={material.imagem} 
-                alt={material.nome} 
-                className="w-16 h-16 rounded-xl object-cover bg-gray-50 border border-gray-150 shrink-0" 
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 shrink-0">
-                <Package size={28} />
-              </div>
-            )}
-            
+            <div className="w-16 h-16 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 shrink-0">
+              <Package size={28} />
+            </div>
+
             <div className="flex-1 min-w-0 text-[11px] text-gray-500 font-semibold space-y-0.5">
               <h3 className="font-bold text-gray-900 text-sm leading-tight truncate mb-0.5">{material.nome}</h3>
-              <p><span className="text-gray-950 font-bold">Código:</span> {material.codigo}</p>
+              <p><span className="text-gray-950 font-bold">Código:</span> {material.codigo_barras}</p>
               <p><span className="text-gray-950 font-bold">Estoque:</span> {material.quantidade}</p>
             </div>
           </div>
