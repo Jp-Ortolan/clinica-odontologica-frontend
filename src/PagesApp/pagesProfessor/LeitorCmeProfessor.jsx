@@ -5,6 +5,22 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import api from '../../Services/api';
 import { interpretarLeitura } from '../../utils/lerCodigo';
 
+// A caixa de leitura precisa caber no vídeo real do aparelho. Com valores
+// fixos ela estourava em telas menores e a região de leitura saía
+// desalinhada da imagem da câmera.
+function calcularQrbox(modo) {
+  return (larguraVideo, alturaVideo) => {
+    const menorLado = Math.min(larguraVideo, alturaVideo);
+    if (modo === 'qrcode') {
+      const lado = Math.max(140, Math.min(Math.floor(menorLado * 0.7), 320));
+      return { width: lado, height: lado };
+    }
+    const largura = Math.max(180, Math.min(Math.floor(larguraVideo * 0.85), 400));
+    const altura = Math.max(80, Math.min(Math.floor(alturaVideo * 0.45), 160));
+    return { width: largura, height: altura };
+  };
+}
+
 export default function LeitorCmeProfessor() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,7 +59,8 @@ export default function LeitorCmeProfessor() {
 
       const config = {
         fps: 10,
-        qrbox: abaAtiva === 'qrcode' ? { width: 220, height: 220 } : { width: 280, height: 120 },
+        qrbox: calcularQrbox(abaAtiva),
+        aspectRatio: abaAtiva === 'qrcode' ? 1 : 1.7778,
         formatsToSupport: formatosSuportados,
       };
 
@@ -241,7 +258,7 @@ export default function LeitorCmeProfessor() {
         <section aria-label="Visor da Câmera" className="flex flex-col items-center justify-center pt-2 shrink-0">
           <div 
             className={`w-full bg-slate-900 rounded-2xl relative transition-all duration-300 overflow-hidden shadow-inner flex items-center justify-center ${
-              abaAtiva === 'qrcode' ? 'h-64' : 'h-40'
+              abaAtiva === 'qrcode' ? 'aspect-square max-h-[280px]' : 'aspect-video max-h-[200px]'
             }`}
           >
             {/* Div Alvo da Biblioteca html5-qrcode */}

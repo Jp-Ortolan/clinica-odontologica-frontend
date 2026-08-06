@@ -1,3 +1,56 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Leitores de QR-Code e código de barras ──────────────────────────────
+ *
+ * A html5-qrcode injeta um <video> (e às vezes um <canvas> e uma moldura
+ * própria) dentro do elemento que recebe o id do scanner. Classes do
+ * Tailwind aplicadas na <div> não alcançam esses filhos, então o vídeo
+ * ficava no tamanho nativo da câmera: menor que a caixa em uns aparelhos,
+ * transbordando e desalinhado em outros — as cantoneiras amarelas não
+ * batiam com a imagem.
+ *
+ * Estas regras forçam o vídeo a preencher a área de leitura mantendo a
+ * proporção (object-fit: cover), e escondem a moldura/legenda que a
+ * biblioteca desenha por conta própria, já que a tela tem a sua.
+ */
+#scanner-viewport,
+#scanner-viewport-aluno,
+#reader-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#scanner-viewport video,
+#scanner-viewport-aluno video,
+#reader-container video,
+#scanner-viewport canvas,
+#scanner-viewport-aluno canvas,
+#reader-container canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  display: block;
+}
+
+/* A lib insere um <div> com a borda tracejada do "qrbox" e um rodapé com
+   texto de status. Ambos concorrem com a interface da tela. */
+#scanner-viewport__scan_region img,
+#scanner-viewport-aluno__scan_region img,
+#reader-container__scan_region img,
+#scanner-viewport__dashboard,
+#scanner-viewport-aluno__dashboard,
+#reader-container__dashboard {
+  display: none !important;
+}
+
+#scanner-viewport__scan_region,
+#scanner-viewport-aluno__scan_region,
+#reader-container__scan_region {
+  min-height: 0 !important;
+}

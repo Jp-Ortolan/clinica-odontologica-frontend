@@ -5,6 +5,25 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import api from '../../Services/api';
 import { buscarMaterialPorLeitura } from '../../utils/lerCodigo';
 
+// A caixa de leitura precisa caber no vídeo real do aparelho. Com valores
+// fixos (220x220 / 280x120) ela estourava em telas menores e a região de
+// leitura saía desalinhada da imagem. A html5-qrcode aceita uma função que
+// recebe as dimensões reais do viewfinder.
+function calcularQrbox(modo) {
+  return (larguraVideo, alturaVideo) => {
+    const menorLado = Math.min(larguraVideo, alturaVideo);
+    if (modo === 'qrcode') {
+      // Quadrado com 70% do menor lado, limitado para não ficar gigante.
+      const lado = Math.max(140, Math.min(Math.floor(menorLado * 0.7), 320));
+      return { width: lado, height: lado };
+    }
+    // Código de barras: faixa larga e baixa.
+    const largura = Math.max(180, Math.min(Math.floor(larguraVideo * 0.85), 400));
+    const altura = Math.max(80, Math.min(Math.floor(alturaVideo * 0.45), 160));
+    return { width: largura, height: altura };
+  };
+}
+
 export default function LeitorScanner() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,7 +71,8 @@ export default function LeitorScanner() {
           { facingMode: 'environment' },
           {
             fps: 10,
-            qrbox: abaAtiva === 'qrcode' ? { width: 220, height: 220 } : { width: 280, height: 120 },
+            qrbox: calcularQrbox(abaAtiva),
+            aspectRatio: abaAtiva === 'qrcode' ? 1 : 1.7778,
             formatsToSupport: formatos,
           },
           (textoLido) => {
@@ -207,7 +227,7 @@ export default function LeitorScanner() {
           
           {/* Caixa do Scanner */}
           <div className={`w-full bg-slate-900 rounded-2xl relative transition-all duration-300 overflow-hidden shadow-inner ${
-            abaAtiva === 'qrcode' ? 'aspect-square' : 'aspect-[16/8]'
+            abaAtiva === 'qrcode' ? 'aspect-square max-h-[300px]' : 'aspect-video max-h-[220px]'
           }`}>
             
             {/* Viewport real da câmera */}
