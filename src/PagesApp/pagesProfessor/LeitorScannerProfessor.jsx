@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, History, Keyboard, Barcode, X, Camera, CheckCircle2, Copy } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import api from '../../Services/api';
+import { buscarMaterialPorLeitura } from '../../utils/lerCodigo';
 
 export default function LeitorScannerProfessor() {
   const navigate = useNavigate();
@@ -104,17 +105,28 @@ export default function LeitorScannerProfessor() {
 
     setHistoricoLeituras((prev) => [novaLeitura, ...prev]);
 
-    // Busca o material real pelo código lido/digitado e vai para a tela de detalhes
+    // O QR gerado pelo sistema traz "material:ID|codigo_barras:...|nome:...",
+    // não o código cru. Antes o texto inteiro ia como termo de busca e nunca
+    // casava com nada — por isso ler o QR não fazia nada acontecer.
     try {
-      const resposta = await api.get('/materiais', { params: { busca: codigo } });
-      const encontrado = resposta.data.find((m) => m.codigo_barras === codigo) || resposta.data[0];
+      const { material, leitura } = await buscarMaterialPorLeitura(api, codigo);
 
-      if (!encontrado) {
-        setErroCamera('Nenhum material encontrado com esse código.');
+      // QR de pacote do CME lido na tela de estoque: manda pro lugar certo.
+      if (leitura.tipo === 'pacote') {
+        navigate('/app/professor/cme/leitor', { state: { codigoLido: codigo } });
         return;
       }
 
-      navigate('/app/professor/estoque/detalhes', { state: { material: encontrado } });
+      if (!material) {
+        setErroCamera(
+          leitura.tipo === 'codigo'
+            ? `Nenhum material cadastrado com o código ${leitura.valor}.`
+            : 'Nenhum material encontrado para esta etiqueta.'
+        );
+        return;
+      }
+
+      navigate('/app/professor/estoque/detalhes', { state: { material } });
     } catch (err) {
       console.error('Erro ao buscar material:', err);
       setErroCamera('Erro ao buscar material pelo código lido.');

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, History, Keyboard, Barcode, X, Search } from 'lucide-react';
 import api from '../../Services/api';
+import { buscarMaterialPorLeitura } from '../../utils/lerCodigo';
 
 export default function LeitorScanner() {
   const navigate = useNavigate();
@@ -29,16 +30,21 @@ export default function LeitorScanner() {
     setBuscando(true);
     setErroBusca('');
     try {
-      const resposta = await api.get('/materiais', { params: { busca: codigoDigitado.trim() } });
-      const encontrado = resposta.data.find((m) => m.codigo_barras === codigoDigitado.trim()) || resposta.data[0];
+      // Aceita tanto o código impresso na embalagem quanto o conteúdo do
+      // QR gerado pelo sistema ("material:ID|codigo_barras:...|nome:...").
+      const { material, leitura } = await buscarMaterialPorLeitura(api, codigoDigitado.trim());
 
-      if (!encontrado) {
-        setErroBusca('Nenhum material encontrado com esse código.');
+      if (!material) {
+        setErroBusca(
+          leitura.tipo === 'codigo'
+            ? `Nenhum material cadastrado com o código ${leitura.valor}.`
+            : 'Nenhum material encontrado para esta etiqueta.'
+        );
         return;
       }
 
       setModalDigitarAberto(false);
-      navigate('/app/aluno/estoque/detalhes', { state: { material: encontrado } });
+      navigate('/app/aluno/estoque/detalhes', { state: { material } });
     } catch (err) {
       console.error('Erro ao buscar material:', err);
       setErroBusca('Erro ao buscar material.');

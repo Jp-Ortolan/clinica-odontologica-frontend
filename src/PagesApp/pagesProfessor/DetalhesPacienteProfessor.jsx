@@ -602,7 +602,7 @@ export default function DetalhesPacienteProfessor() {
                 </div>
 
                 {/* FAB - Enviar Documento */}
-                <div className="fixed bottom-6 right-6 z-10">
+                <div className="absolute bottom-6 right-6 z-20">
                   <input
                     ref={inputArquivoRef}
                     type="file"

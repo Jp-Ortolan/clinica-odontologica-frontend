@@ -24,8 +24,23 @@ export function useContagemNaoLidas({ intervaloMs = 60000 } = {}) {
   useEffect(() => {
     buscar();
     if (!intervaloMs) return undefined;
+
     const id = setInterval(buscar, intervaloMs);
-    return () => clearInterval(id);
+
+    // Além do poll, revalida quando a pessoa volta pra aba/tela. Sem isso o
+    // badge podia ficar até um minuto desatualizado logo depois de uma ação
+    // que gera notificação, dando a impressão de que nada aconteceu.
+    const aoVoltar = () => {
+      if (document.visibilityState === 'visible') buscar();
+    };
+    document.addEventListener('visibilitychange', aoVoltar);
+    window.addEventListener('focus', buscar);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', aoVoltar);
+      window.removeEventListener('focus', buscar);
+    };
   }, [buscar, intervaloMs]);
 
   return { total, recarregar: buscar };

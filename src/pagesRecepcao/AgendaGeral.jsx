@@ -237,7 +237,7 @@ export default function AgendaGeral() {
       {/* Botão Novo Agendamento */}
       <button 
         onClick={() => navigate('/app/recepcao/agenda/novo-agendamento')}
-        className="fixed bottom-6 right-8 bg-[#F9A814] text-white p-4 rounded-full shadow-lg shadow-orange-500/20 hover:bg-orange-500 hover:scale-105 transition-all z-40"
+        className="absolute bottom-6 right-8 bg-[#F9A814] text-white p-4 rounded-full shadow-lg shadow-orange-500/20 hover:bg-orange-500 hover:scale-105 transition-all z-40"
       >
         <Plus size={24} className="stroke-[3]" />
       </button>

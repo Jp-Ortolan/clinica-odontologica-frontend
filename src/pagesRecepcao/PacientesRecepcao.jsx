@@ -170,7 +170,7 @@ export default function PacientesRecepcao() {
         )}
 
         {/* BOTÃO FLUTUANTE DE CADASTRO MOBILE */}
-        <div className="sm:hidden fixed bottom-6 right-6 select-none z-50">
+        <div className="sm:hidden absolute bottom-6 right-6 select-none z-50">
           <button 
             onClick={() => navigate('/app/recepcao/pacientes/cadastro')}
             className="bg-[#F9A814] text-white p-4 rounded-full transition shadow-xl flex items-center justify-center active:scale-95"

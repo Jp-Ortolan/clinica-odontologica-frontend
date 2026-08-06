@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, Loader2, Users, X, Plus } from 'lucide-react';
 import api from '../../Services/api';
+import { useAuth } from '../../context/AuthContext';
 
 // Agendamento de cirurgia. O backend tinha POST /cirurgias, PUT /cirurgias/:id
 // e POST /cirurgias/:id/alunos desde sempre, mas não havia tela nenhuma que
@@ -15,6 +16,7 @@ const PAPEIS = ['executante', 'auxiliar', 'observador'];
 export default function NovaCirurgia() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { usuario } = useAuth();
   const cirurgiaEdicao = location.state?.cirurgia || null;
   const editando = Boolean(cirurgiaEdicao?.id);
 
@@ -41,11 +43,36 @@ export default function NovaCirurgia() {
   const [erro, setErro] = useState('');
 
   useEffect(() => {
-    api.get('/pacientes').then((r) => setPacientes(r.data)).catch(() => {});
-    api.get('/usuarios').then((r) => setUsuarios(r.data)).catch(() => {});
+    api.get('/pacientes')
+      .then((r) => setPacientes(r.data))
+      .catch((err) => {
+        console.error('Erro ao carregar pacientes:', err);
+        setErro('Não foi possível carregar a lista de pacientes.');
+      });
+
+    api.get('/usuarios')
+      .then((r) => setUsuarios(r.data))
+      .catch((err) => {
+        console.error('Erro ao carregar responsáveis:', err);
+        // Sem a lista de usuários o campo "Responsável" ficaria vazio e o
+        // formulário travava sem explicar o motivo. Ao menos o próprio
+        // professor logado continua selecionável.
+        if (usuario?.id) setUsuarios([usuario]);
+        setErro('Não foi possível carregar a lista de responsáveis. Você aparece como opção.');
+      });
+
     api.get('/cirurgias/mutiroes').then((r) => setMutiroes(r.data)).catch(() => {});
     api.get('/consultas/disciplinas').then((r) => setDisciplinas(r.data)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Numa cirurgia nova, quem está agendando costuma ser o responsável —
+  // deixa pré-selecionado em vez de exigir o passo extra.
+  useEffect(() => {
+    if (!cirurgiaEdicao && !usuarioId && usuario?.id) {
+      setUsuarioId(String(usuario.id));
+    }
+  }, [usuario, cirurgiaEdicao, usuarioId]);
 
   useEffect(() => {
     if (!cirurgiaEdicao) return;

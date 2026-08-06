@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Package, Camera, RefreshCw } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import api from '../../Services/api';
+import { interpretarLeitura } from '../../utils/lerCodigo';
 
 export default function LeitorCmeProfessor() {
   const navigate = useNavigate();
@@ -59,14 +60,15 @@ export default function LeitorCmeProfessor() {
             // Sucesso na leitura
             setUltimoCodigoLido({
               id: decodedText,
-              nome: 'Item Identificado',
+              nome: 'Identificando...',
               data: new Date().toLocaleString('pt-BR'),
               formato: decodedResult?.result?.format?.formatName || abaAtiva,
             });
 
-            // O QR-code do pacote guarda "ciclo:X|material:Y|validade:...|gerado:...",
-            // não o id do pacote em si — a resolução pra um pacote exato
-            // acontece ao tocar no card "Última leitura" (handleAbrirLeitura).
+            // Resolve o pacote na hora. Antes era preciso tocar no card
+            // "Última leitura" para isso acontecer, o que dava a impressão
+            // de que ler o QR não fazia nada.
+            resolverLeitura(decodedText);
           },
           () => {
             // Callback de escaneamento contínuo (frame a frame sem leitura)
@@ -92,6 +94,51 @@ export default function LeitorCmeProfessor() {
       }
     };
   }, [abaAtiva]);
+
+  // Resolve o texto lido para um pacote real e navega. Chamada tanto pela
+  // câmera quanto pelo botão "Digitar código".
+  const resolverLeitura = async (texto) => {
+    const leitura = interpretarLeitura(texto);
+
+    if (leitura.tipo !== 'pacote' || !leitura.cicloId) {
+      // Não é etiqueta de pacote (ex.: QR de material ou código de barras).
+      setUltimoCodigoLido((atual) => atual && {
+        ...atual,
+        nome: leitura.tipo === 'material'
+          ? (leitura.nome || 'Material do estoque')
+          : 'Código não reconhecido como pacote',
+      });
+      return;
+    }
+
+    setResolvendo(true);
+    try {
+      const { data: pacotes } = await api.get(`/esterilizacoes/${leitura.cicloId}/pacotes`);
+      const candidatos = pacotes.filter((p) => Number(p.material_id) === leitura.materialId);
+
+      if (candidatos.length === 1) {
+        const pacote = candidatos[0];
+        setUltimoCodigoLido((atual) => atual && {
+          ...atual,
+          nome: pacote.material_nome || `Pacote #${pacote.id}`,
+        });
+        navigate(`/app/professor/cme/pacote-detalhes/${pacote.id}`, { state: { pacote } });
+        return;
+      }
+
+      setUltimoCodigoLido((atual) => atual && {
+        ...atual,
+        nome: candidatos.length === 0
+          ? 'Pacote não encontrado neste ciclo'
+          : `${candidatos.length} pacotes iguais neste ciclo — toque para escolher`,
+      });
+    } catch (err) {
+      console.error('Erro ao resolver pacote a partir do QR-code:', err);
+      setUltimoCodigoLido((atual) => atual && { ...atual, nome: 'Erro ao consultar o ciclo' });
+    } finally {
+      setResolvendo(false);
+    }
+  };
 
   // Tenta resolver o texto lido pra um pacote específico: o QR-code
   // codifica "ciclo:X|material:Y|...", então buscamos os pacotes daquele
