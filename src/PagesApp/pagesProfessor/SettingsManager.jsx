@@ -1,40 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, Search, ChevronRight, CloudDownload, Download, 
-  ChevronDown, User, Users, ShieldCheck, FileText, FileSearch, LogOut, Plus 
+import {
+  ArrowLeft, Search, ChevronRight, CloudDownload, Download,
+  ChevronDown, User, Users, ShieldCheck, FileText, FileSearch, LogOut, Plus
 } from 'lucide-react';
+import api from '../../Services/api';
+import { useAuth } from '../../context/AuthContext';
+
+// Mapa entre o "perfil" real do backend e o rótulo em português usado na UI
+const LABEL_PERFIL = { professor: 'Professor', aluno: 'Aluno', recepcionista: 'Recepção' };
 
 export default function SettingsManager({ onClose, onLogout }) {
   const navigate = useNavigate();
+  const { usuario, logout } = useAuth();
 
   // Estado para controlar qual tela está ativa internamente
   const [telaInterna, setTelaInterna] = useState('configuracoes');
-  
+
   // Estados para a tela de Usuários
   const [buscaUsuarios, setBuscaUsuarios] = useState('');
   const [filtroUsuarios, setFiltroUsuarios] = useState('Todos');
-  
+
   // Estados para Permissões
-  const [perfilSelecionado, setPerfilSelecionado] = useState('Administrador');
-  
+  const [perfilSelecionado, setPerfilSelecionado] = useState('Professor');
+
   // Estados para Logs
   const [buscaLogs, setBuscaLogs] = useState('');
   const [filtroLogs, setFiltroLogs] = useState('Todos');
-  
+
   // Estados para Auditoria
   const [buscaAuditoria, setBuscaAuditoria] = useState('');
   const [filtroAuditoria, setFiltroAuditoria] = useState('Todos');
 
-  // Dados Mockados - Usuários
-  const usuariosData = [
-    { id: 1, nome: 'Rhaya Borges', email: 'engs-rhayannatonete@camporeal.edu.br', perfil: 'Administrador' },
-    { id: 2, nome: 'Nome do usuário', email: 'Email', perfil: 'Recepção' },
-    { id: 3, nome: 'Nome do usuário', email: 'Email', perfil: 'Aluno' },
-    { id: 4, nome: 'Nome do usuário', email: 'Email', perfil: 'Aluno' },
-    { id: 5, nome: 'Nome do usuário', email: 'Email', perfil: 'Recepção' },
-    { id: 6, nome: 'Nome do usuário', email: 'Email', perfil: 'Administrador' },
-  ];
+  // Usuários reais do backend (GET /usuarios)
+  const [usuariosData, setUsuariosData] = useState([]);
+
+  useEffect(() => {
+    api.get('/usuarios')
+      .then((res) => setUsuariosData(res.data.map((u) => ({
+        id: u.id,
+        nome: u.nome,
+        email: u.email,
+        perfil: LABEL_PERFIL[u.perfil] || u.perfil,
+      }))))
+      .catch((err) => console.error('Erro ao carregar usuários:', err));
+  }, [telaInterna]);
 
   // Dados Mockados - Perfis
   const perfis = [
@@ -155,6 +165,7 @@ export default function SettingsManager({ onClose, onLogout }) {
     if (onLogout) {
       onLogout();
     } else {
+      logout();
       navigate('/login');
     }
   };
@@ -191,8 +202,8 @@ export default function SettingsManager({ onClose, onLogout }) {
                   <User size={30} />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-gray-900">Rhaya Borges</h3>
-                  <p className="text-xs font-semibold text-gray-500">Administrador / Professor</p>
+                  <h3 className="text-base font-black text-gray-900">{usuario?.nome || 'Usuário'}</h3>
+                  <p className="text-xs font-semibold text-gray-500">{LABEL_PERFIL[usuario?.perfil] || usuario?.perfil || ''}</p>
                 </div>
               </div>
               <ChevronRight size={20} className="text-[#3B44A8] shrink-0" />

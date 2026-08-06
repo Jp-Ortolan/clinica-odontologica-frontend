@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -13,6 +13,7 @@ import {
   User,
   X
 } from 'lucide-react';
+import api from '../../Services/api';
 
 export default function PacientesProfessor() {
   const navigate = useNavigate();
@@ -20,16 +21,18 @@ export default function PacientesProfessor() {
   // Estados da página
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos'); // 'todos' | 'ativo' | 'inativo'
+  const [pacientes, setPacientes] = useState([]);
 
-  // Fila de pacientes (dados simulados)
-  const [pacientes] = useState([
-    { id: 1, nome: 'Rhaya Borges', cpf: '01212345689', status: 'ativo' },
-    { id: 2, nome: 'Carlos Eduardo Silva', cpf: '98765432100', status: 'ativo' },
-    { id: 3, nome: 'Mariana Oliveira', cpf: '45678912344', status: 'ativo' },
-    { id: 4, nome: 'João Pedro Santos', cpf: '11122233344', status: 'inativo' },
-    { id: 5, nome: 'Ana Beatriz Souza', cpf: '55566677788', status: 'ativo' },
-    { id: 6, nome: 'Lucas Mendes', cpf: '99988877766', status: 'inativo' },
-  ]);
+  useEffect(() => {
+    api.get('/pacientes')
+      .then((res) => setPacientes(res.data.map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        cpf: p.cpf,
+        status: p.ativo === false ? 'inativo' : 'ativo',
+      }))))
+      .catch((err) => console.error('Erro ao carregar pacientes:', err));
+  }, []);
 
   // Função utilitária para formatar CPF na exibição
   const formatarCPF = (cpf) => {
@@ -149,7 +152,7 @@ export default function PacientesProfessor() {
               {pacientesFiltrados.map((paciente) => (
                 <div
                   key={paciente.id}
-                  onClick={() => navigate(`/app/professor/pacientes/${paciente.id}`)}
+                  onClick={() => navigate('/app/professor/pacientes/detalhes', { state: { paciente } })}
                   className="p-3.5 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer active:bg-slate-100 gap-3 group"
                 >
                   {/* Ícone do Paciente */}

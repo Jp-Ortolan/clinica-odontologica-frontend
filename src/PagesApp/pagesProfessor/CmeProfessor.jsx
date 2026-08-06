@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -7,28 +7,59 @@ import {
   ChevronRight,
   PackageCheck
 } from 'lucide-react';
-
-const STORAGE_KEY_MATERIAIS = '@app_clinica:materiais_estoque';
+import api from '../../Services/api';
 
 export default function CmeProfessor() {
   const navigate = useNavigate();
-  const [materiais, setMateriais] = useState([]);
+  const [ciclos, setCiclos] = useState([]);
+  const [pacotesRecentes, setPacotesRecentes] = useState([]);
+  const [carregando, setCarregando] = useState(true);
 
-  // Carrega os materiais cadastrados no localStorage
   useEffect(() => {
-    const dadosSalvos = localStorage.getItem(STORAGE_KEY_MATERIAIS);
-    if (dadosSalvos) {
-      try {
-        setMateriais(JSON.parse(dadosSalvos));
-      } catch (error) {
-        console.error('Erro ao ler materiais do localStorage:', error);
-      }
-    }
+    api.get('/esterilizacoes')
+      .then(async (res) => {
+        const listaCiclos = res.data;
+        setCiclos(listaCiclos);
+
+        // O backend não expõe uma listagem global de pacotes — eles vivem
+        // como sub-recurso de cada ciclo. Buscamos os pacotes dos ciclos
+        // mais recentes (limite para não disparar N+1 requisições sem fim).
+        const ciclosRecentes = [...listaCiclos]
+          .sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora))
+          .slice(0, 5);
+
+        const resultados = await Promise.all(
+          ciclosRecentes.map((c) =>
+            api.get(`/esterilizacoes/${c.id}/pacotes`)
+              .then((r) => r.data.map((p) => ({ ...p, ciclo: c })))
+              .catch(() => [])
+          )
+        );
+
+        const todosPacotes = resultados.flat().sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+        setPacotesRecentes(todosPacotes.slice(0, 3));
+      })
+      .catch((err) => console.error('Erro ao carregar esterilizações:', err))
+      .finally(() => setCarregando(false));
   }, []);
+
+  const emAndamento = ciclos.filter((c) => c.status === 'em_andamento').length;
+  const pendencias = ciclos.filter((c) => c.status === 'pendente' || c.resultado === 'reprovado').length;
+  const autoclavesRecentes = [...ciclos]
+    .sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora))
+    .slice(0, 2);
+  const ultimoCiclo = autoclavesRecentes[0];
+
+  const STATUS_LABEL = {
+    pendente: { texto: 'Pendente', cor: 'bg-indigo-100 text-[#3B42B2]' },
+    em_andamento: { texto: 'Em andamento', cor: 'bg-amber-100 text-amber-700' },
+    concluido: { texto: 'Concluído', cor: 'bg-emerald-100 text-emerald-700' },
+    falhou: { texto: 'Falhou', cor: 'bg-rose-100 text-rose-700' },
+  };
 
   return (
     <div className="w-full h-full bg-[#3B42B2] text-white flex flex-col font-sans m-0 p-0 overflow-hidden relative">
-      
+
       {/* HEADER / TOPO */}
       <div className="pt-8 pb-4 px-4 flex items-center justify-between shrink-0">
         <button
@@ -47,20 +78,20 @@ export default function CmeProfessor() {
 
       {/* CARD PRINCIPAL BRANCO COM SCROLL */}
       <div className="bg-white text-slate-800 rounded-t-[32px] px-4 pt-5 pb-8 flex-1 overflow-y-auto flex flex-col space-y-6 shadow-inner relative">
-        
+
         {/* 1. CARDS DE MÉTRICAS / RESUMO */}
         <div className="grid grid-cols-3 gap-2">
-          {/* Pacotes esterilizados */}
-          <div 
+          {/* Ciclos cadastrados */}
+          <div
             onClick={() => navigate('/app/professor/cme/pacotes-esterilizados')}
             className="border border-slate-100 rounded-2xl p-3 bg-white shadow-xs text-center flex flex-col justify-between cursor-pointer hover:bg-slate-50 transition active:scale-95"
           >
             <span className="text-[10px] font-bold text-slate-700 leading-tight">
-              Pacotes cadastrados
+              Ciclos cadastrados
             </span>
             <div className="my-1">
               <span className="text-2xl font-black text-[#3B42B2]">
-                {materiais.length}
+                {ciclos.length}
               </span>
             </div>
             <span className="text-[10px] font-bold text-slate-400">Total</span>
@@ -72,7 +103,7 @@ export default function CmeProfessor() {
               Em andamento
             </span>
             <div className="my-1">
-              <span className="text-2xl font-black text-[#3B42B2]">2</span>
+              <span className="text-2xl font-black text-[#3B42B2]">{emAndamento}</span>
             </div>
             <span className="text-[10px] font-bold text-slate-400">Processos</span>
           </div>
@@ -84,7 +115,7 @@ export default function CmeProfessor() {
             </span>
             <div className="my-1">
               <span className="text-2xl font-black text-rose-600">
-                {materiais.filter(item => item.estoqueAtual <= item.estoqueMinimo).length || 3}
+                {pendencias}
               </span>
             </div>
             <span className="text-[10px] font-bold text-slate-400">Ações</span>
@@ -99,7 +130,7 @@ export default function CmeProfessor() {
 
           <div className="grid grid-cols-2 gap-3">
             {/* Escanear QR-Code */}
-            <button 
+            <button
               onClick={() => navigate('/app/professor/cme/leitor', { state: { abaInicial: 'qrcode' } })}
               className="bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-100/50 rounded-2xl p-3 flex items-center justify-center gap-3 transition active:scale-95 cursor-pointer"
             >
@@ -112,7 +143,7 @@ export default function CmeProfessor() {
             </button>
 
             {/* Escanear Código de Barras */}
-            <button 
+            <button
               onClick={() => navigate('/app/professor/cme/leitor', { state: { abaInicial: 'barras' } })}
               className="bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-100/50 rounded-2xl p-3 flex items-center justify-center gap-3 transition active:scale-95 cursor-pointer"
             >
@@ -126,58 +157,58 @@ export default function CmeProfessor() {
           </div>
         </div>
 
-        {/* 3. AUTOCLAVES */}
+        {/* 3. CICLOS DE ESTERILIZAÇÃO RECENTES */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="font-extrabold text-[#3B42B2] text-xs">
-              Autoclaves
+              Ciclos recentes
             </h3>
-            <button 
+            <button
               onClick={() => navigate('/app/professor/cme/controle-biologico')}
               className="text-[10px] font-bold text-[#3B42B2] hover:underline cursor-pointer active:scale-95 transition"
             >
-              Ver todos
+              Controle biológico
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            {/* Autoclave 01 */}
-            <div className="border border-slate-200 rounded-2xl p-3.5 bg-white shadow-xs space-y-2">
-              <div>
-                <h4 className="font-extrabold text-slate-800 text-xs">Autoclave 01</h4>
-                <p className="text-[10px] text-slate-500 font-bold">120º - 25 min</p>
-              </div>
-              <span className="inline-block bg-amber-100 text-amber-700 text-[9px] font-extrabold px-2 py-0.5 rounded-full">
-                Em andamento
-              </span>
-              <p className="text-[9px] text-slate-500 font-bold pt-1">
-                Início: 25/05 - 10:30
-              </p>
+          {carregando ? (
+            <div className="text-center text-slate-400 text-xs font-semibold py-4">Carregando ciclos...</div>
+          ) : autoclavesRecentes.length === 0 ? (
+            <div className="border border-dashed border-slate-200 rounded-2xl p-4 text-center text-slate-400 text-xs font-semibold">
+              Nenhum ciclo de esterilização registrado.
             </div>
-
-            {/* Autoclave 02 */}
-            <div className="border border-slate-200 rounded-2xl p-3.5 bg-white shadow-xs space-y-2">
-              <div>
-                <h4 className="font-extrabold text-slate-800 text-xs">Autoclave 02</h4>
-                <p className="text-[10px] text-slate-500 font-bold">134º - 18 min</p>
-              </div>
-              <span className="inline-block bg-indigo-100 text-[#3B42B2] text-[9px] font-extrabold px-2 py-0.5 rounded-full">
-                Aguardando
-              </span>
-              <p className="text-[9px] text-slate-500 font-bold pt-1">
-                Início previsto: 25/05 - 10:30
-              </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {autoclavesRecentes.map((ciclo) => {
+                const status = STATUS_LABEL[ciclo.status] || { texto: ciclo.status, cor: 'bg-slate-100 text-slate-600' };
+                return (
+                  <div key={ciclo.id} className="border border-slate-200 rounded-2xl p-3.5 bg-white shadow-xs space-y-2">
+                    <div>
+                      <h4 className="font-extrabold text-slate-800 text-xs">{ciclo.equipamento || `Ciclo ${ciclo.id}`}</h4>
+                      <p className="text-[10px] text-slate-500 font-bold">
+                        {ciclo.temperatura ? `${ciclo.temperatura}º` : ''}{ciclo.duracao_minutos ? ` - ${ciclo.duracao_minutos} min` : ''}
+                      </p>
+                    </div>
+                    <span className={`inline-block text-[9px] font-extrabold px-2 py-0.5 rounded-full ${status.cor}`}>
+                      {status.texto}
+                    </span>
+                    <p className="text-[9px] text-slate-500 font-bold pt-1">
+                      {ciclo.data_hora ? new Date(ciclo.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : ''}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </div>
 
-        {/* 4. PACOTES ESTERILIZADOS / MATERIAIS */}
+        {/* 4. PACOTES ESTERILIZADOS */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="font-extrabold text-[#3B42B2] text-xs">
               Pacotes esterilizados
             </h3>
-            <button 
+            <button
               onClick={() => navigate('/app/professor/cme/pacotes-esterilizados')}
               className="text-[10px] font-bold text-[#3B42B2] hover:underline cursor-pointer"
             >
@@ -186,38 +217,39 @@ export default function CmeProfessor() {
           </div>
 
           <div className="space-y-3">
-            {materiais.length === 0 ? (
+            {pacotesRecentes.length === 0 ? (
               <div className="border border-dashed border-slate-200 rounded-2xl p-4 text-center text-slate-400 text-xs font-semibold">
-                Nenhum material cadastrado recentemente.
+                Nenhum pacote cadastrado recentemente.
               </div>
             ) : (
-              materiais.slice(0, 3).map((item) => (
-                <div 
+              pacotesRecentes.map((item) => (
+                <div
                   key={item.id}
-                  onClick={() => navigate('/app/professor/cme/pacotes-esterilizados')}
+                  onClick={() => navigate('/app/professor/cme/pacote-detalhes', { state: { pacote: item } })}
                   className="border border-slate-200 rounded-2xl p-3 bg-white shadow-xs flex items-center justify-between cursor-pointer hover:bg-slate-50 transition active:scale-98"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200/60 shrink-0">
-                      {item.imagem ? (
-                        <img src={item.imagem} alt={item.nome} className="w-full h-full object-cover" />
-                      ) : (
-                        <PackageCheck className="w-6 h-6 text-[#3B42B2]" />
-                      )}
+                      <PackageCheck className="w-6 h-6 text-[#3B42B2]" />
                     </div>
                     <div className="space-y-0.5">
-                      <h4 className="font-extrabold text-[#3B42B2] text-xs">{item.nome}</h4>
-                      <p className="text-[9px] text-slate-500 font-bold">Código: {item.codigoBarras}</p>
-                      <p className="text-[9px] text-slate-500 font-bold">Categoria: {item.categoria || 'Geral'}</p>
+                      <h4 className="font-extrabold text-[#3B42B2] text-xs">{item.material_nome}</h4>
+                      <p className="text-[9px] text-slate-500 font-bold">
+                        Validade: {item.validade ? new Date(item.validade).toLocaleDateString('pt-BR') : 'N/I'}
+                      </p>
                       <p className="text-[8px] text-slate-400 font-medium">
-                        {item.criadoEm ? new Date(item.criadoEm).toLocaleDateString('pt-BR') : 'Hoje'}
+                        {item.criado_em ? new Date(item.criado_em).toLocaleDateString('pt-BR') : ''}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-col items-end gap-3">
-                    <span className="bg-emerald-100 text-emerald-700 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full">
-                      Válido
+                    <span className={`text-[9px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                      item.status === 'esterilizado' ? 'bg-emerald-100 text-emerald-700' :
+                      item.status === 'vencido' ? 'bg-rose-100 text-rose-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>
+                      {item.status === 'esterilizado' ? 'Válido' : item.status === 'vencido' ? 'Vencido' : 'Utilizado'}
                     </span>
                     <ChevronRight className="w-5 h-5 text-[#3B42B2]" />
                   </div>
@@ -227,38 +259,41 @@ export default function CmeProfessor() {
           </div>
         </div>
 
-        {/* 5. ESTERILIZAÇÕES */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="font-extrabold text-[#3B42B2] text-xs">
-              Esterilizações
-            </h3>
-            <button className="text-[10px] font-bold text-[#3B42B2] hover:underline cursor-pointer">
-              Ver todas
-            </button>
-          </div>
-
-          <div className="border border-slate-200 rounded-2xl p-3 bg-white shadow-xs flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-[#3B42B2] shrink-0">
-                <span className="text-2xl">⚙️</span>
-              </div>
-              <div className="space-y-0.5">
-                <h4 className="font-extrabold text-[#3B42B2] text-xs">Ciclo 2548</h4>
-                <p className="text-[9px] text-slate-500 font-bold">Autoclave: 02 • 134º - 18 min</p>
-                <p className="text-[9px] text-slate-500 font-bold">Início: 25/05 - 10:30 | Fim: 25/05 - 10:50</p>
-                <p className="text-[9px] text-slate-500 font-bold">Responsável: Aline Soares</p>
-              </div>
+        {/* 5. ÚLTIMO CICLO DE ESTERILIZAÇÃO */}
+        {ultimoCiclo && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-[#3B42B2] text-xs">
+                Última esterilização
+              </h3>
             </div>
 
-            <div className="flex flex-col items-end gap-3">
-              <span className="bg-emerald-100 text-emerald-700 text-[9px] font-extrabold px-2 py-0.5 rounded-full">
-                Concluído
-              </span>
-              <ChevronRight className="w-5 h-5 text-[#3B42B2]" />
+            <div className="border border-slate-200 rounded-2xl p-3 bg-white shadow-xs flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-[#3B42B2] shrink-0">
+                  <span className="text-2xl">⚙️</span>
+                </div>
+                <div className="space-y-0.5">
+                  <h4 className="font-extrabold text-[#3B42B2] text-xs">Ciclo {ultimoCiclo.id}</h4>
+                  <p className="text-[9px] text-slate-500 font-bold">
+                    {ultimoCiclo.equipamento || 'Equipamento não informado'} • {ultimoCiclo.tipo_ciclo}
+                  </p>
+                  <p className="text-[9px] text-slate-500 font-bold">
+                    {ultimoCiclo.data_hora ? new Date(ultimoCiclo.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : ''}
+                  </p>
+                  <p className="text-[9px] text-slate-500 font-bold">Responsável: {ultimoCiclo.operador_nome || 'Não informado'}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-3">
+                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${(STATUS_LABEL[ultimoCiclo.status] || {}).cor || 'bg-slate-100 text-slate-600'}`}>
+                  {(STATUS_LABEL[ultimoCiclo.status] || {}).texto || ultimoCiclo.status}
+                </span>
+                <ChevronRight className="w-5 h-5 text-[#3B42B2]" />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
       </div>
     </div>

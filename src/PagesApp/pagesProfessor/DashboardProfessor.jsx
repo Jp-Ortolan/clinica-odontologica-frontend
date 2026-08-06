@@ -1,23 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Bell, Calendar, ChevronRight, User, MapPin, Loader2 } from 'lucide-react';
-
-// Chaves do LocalStorage ou endpoints da API
-const STORAGE_KEYS = {
-  PROFESSOR: '@app_clinica:professor',
-  AGENDAMENTOS: '@app_clinica:agendamentos',
-  CIRURGIAS: '@app_clinica:cirurgias',
-  ESTOQUE: '@app_clinica:estoque',
-  CME: '@app_clinica:controle_biologico',
-};
+import { Settings, Bell, Calendar, ChevronRight, User, Loader2 } from 'lucide-react';
+import api from '../../Services/api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DashboardProfessor() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const [loading, setLoading] = useState(true);
   const [dataAtual, setDataAtual] = useState('');
-  
-  // Estados dinâmicos iniciados vazios para popular via LocalStorage/API
-  const [professor, setProfessor] = useState({ nome: 'Prof. Dr. Ricardo Silva' });
+
   const [metricas, setMetricas] = useState({
     consultasHoje: 0,
     cirurgiasHoje: 0,
@@ -42,49 +34,44 @@ export default function DashboardProfessor() {
     setDataAtual(obterDataFormatada());
   }, []);
 
-  // Carrega os dados reais do localStorage / Banco
+  // Carrega os dados reais do backend
   useEffect(() => {
     const carregarDadosDashboard = async () => {
       setLoading(true);
       try {
-        // 1. Perfil do Professor
-        const perfSalvo = localStorage.getItem(STORAGE_KEYS.PROFESSOR);
-        if (perfSalvo) {
-          setProfessor(JSON.parse(perfSalvo));
-        }
+        const [resumoRes, consultasRes, cirurgiasRes, pacientesRes] = await Promise.all([
+          api.get('/dashboard/resumo'),
+          api.get('/consultas'),
+          api.get('/cirurgias'),
+          api.get('/pacientes'),
+        ]);
 
-        // 2. Agendamentos / Consultas do Dia
-        const agendamentosSalvos = JSON.parse(localStorage.getItem(STORAGE_KEYS.AGENDAMENTOS) || '[]');
-        const consultasFallback = [
-          { horario: "08:30", paciente: "Rhaya Borges", procedimento: "Clareamento Dental", especialidade: "Dentística", local: "Centro Cirúrgico" },
-          { horario: "08:50", paciente: "Carlos Andrade", procedimento: "Restauração", especialidade: "Dentística", local: "Consultório 03" },
-          { horario: "09:00", paciente: "Mariana Souza", procedimento: "Raspagem Polimento", especialidade: "Periodontia", local: "Consultório 05" },
-          { horario: "10:00", paciente: "João Pedro", procedimento: "Avaliação Geral", especialidade: "Cirurgia Bucal", local: "Consultório 03" }
-        ];
-        const atendimentosLista = agendamentosSalvos.length > 0 ? agendamentosSalvos : consultasFallback;
-        setProximosAtendimentos(atendimentosLista);
+        const nomePorId = {};
+        pacientesRes.data.forEach((p) => { nomePorId[p.id] = p.nome; });
 
-        // 3. Cirurgias do Dia
-        const cirurgiasSalvas = JSON.parse(localStorage.getItem(STORAGE_KEYS.CIRURGIAS) || '[]');
-        const cirurgiasFallback = [
-          { horario: "08:30", paciente: "Rhaya Borges", procedimento: "Exodontia - 36", professor: "Prof: Dr. Carlos Eduardo", local: "Centro Cirúrgico" },
-          { horario: "15:30", paciente: "Lucas Ferreira", procedimento: "Extração de siso", professor: "Prof: Dra. Ana Maria", local: "Centro Cirúrgico" }
-        ];
-        const cirurgiasLista = cirurgiasSalvas.length > 0 ? cirurgiasSalvas : cirurgiasFallback;
-        setCirurgiasHoje(cirurgiasLista);
+        const hojeStr = new Date().toDateString();
+        const consultasHoje = consultasRes.data.filter((c) => new Date(c.data_hora).toDateString() === hojeStr);
+        const cirurgiasHojeLista = cirurgiasRes.data.filter((c) => new Date(c.data_hora).toDateString() === hojeStr);
 
-        // 4. Calcular métricas do estoque crítico e CME
-        const estoque = JSON.parse(localStorage.getItem(STORAGE_KEYS.ESTOQUE) || '[]');
-        const itensCriticos = estoque.filter(item => item.quantidade <= (item.minimo || 5)).length || 8;
+        setProximosAtendimentos(consultasHoje.map((c) => ({
+          horario: new Date(c.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          paciente: nomePorId[c.paciente_id] || 'Paciente',
+          procedimento: c.queixa_principal || 'Consulta',
+          status: c.status,
+        })));
 
-        const cme = JSON.parse(localStorage.getItem(STORAGE_KEYS.CME) || '[]');
-        const cmePendentes = cme.filter(item => item.status === 'Em incubação' || item.status === 'Concluído').length || 5;
+        setCirurgiasHoje(cirurgiasHojeLista.map((c) => ({
+          horario: new Date(c.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          paciente: nomePorId[c.paciente_id] || 'Paciente',
+          procedimento: c.tipo_cirurgia || 'Cirurgia',
+          status: c.status,
+        })));
 
         setMetricas({
-          consultasHoje: atendimentosLista.length,
-          cirurgiasHoje: cirurgiasLista.length,
-          estoqueCritico: itensCriticos,
-          cmePendente: cmePendentes,
+          consultasHoje: resumoRes.data.consultas_hoje ?? consultasHoje.length,
+          cirurgiasHoje: resumoRes.data.cirurgias_hoje ?? cirurgiasHojeLista.length,
+          estoqueCritico: resumoRes.data.materiais_estoque_critico ?? 0,
+          cmePendente: resumoRes.data.esterilizacoes_pendentes ?? 0,
         });
 
       } catch (error) {
@@ -132,7 +119,7 @@ export default function DashboardProfessor() {
         <div className="select-none flex items-center justify-between">
           <div>
             <h2 className="text-gray-900 text-xl font-extrabold leading-tight">
-              Olá, {professor.nome || 'Professor'}
+              Olá, {usuario?.nome?.split(' ')[0] || 'Professor'}
             </h2>
             <p className="text-gray-500 text-xs font-medium">Bem-vindo de volta!</p>
           </div>
@@ -293,11 +280,10 @@ export default function DashboardProfessor() {
                 <div className="flex-1 min-w-0 pr-2">
                   <h4 className="font-bold text-gray-900 text-xs truncate leading-tight">{item.paciente}</h4>
                   <p className="text-gray-700 text-[10px] font-semibold leading-tight">{item.procedimento}</p>
-                  <p className="text-gray-400 text-[8px] font-medium leading-none">{item.especialidade}</p>
                 </div>
                 <div className="shrink-0">
-                  <span className="inline-block bg-[#DCE0F5] text-[#3B44A8] text-[8px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
-                    {item.local}
+                  <span className="inline-block bg-[#DCE0F5] text-[#3B44A8] text-[8px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap capitalize">
+                    {item.status}
                   </span>
                 </div>
               </div>
@@ -334,11 +320,7 @@ export default function DashboardProfessor() {
                   <div className="min-w-0">
                     <h4 className="font-bold text-gray-900 text-xs truncate leading-tight">{cirurgia.paciente}</h4>
                     <p className="text-[#3B44A8] text-[10px] font-bold leading-tight">{cirurgia.procedimento}</p>
-                    <p className="text-gray-500 text-[8px] font-medium leading-none">{cirurgia.professor}</p>
-                    <div className="flex items-center gap-0.5 text-[8px] text-gray-400 font-medium mt-0.5">
-                      <MapPin size={9} className="text-[#3B44A8]" />
-                      <span>{cirurgia.local}</span>
-                    </div>
+                    <p className="text-gray-500 text-[8px] font-medium leading-none capitalize">{cirurgia.status}</p>
                   </div>
                 </div>
 

@@ -1,15 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Minus, Plus, Printer } from 'lucide-react';
+import api from '../../Services/api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function PreVisualizacaoEtiquetaProfessor() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { usuario } = useAuth();
 
   // Tratamento seguro de fallback para o state
   const dados = useMemo(() => {
     const defaultData = {
-      material: { nome: 'GAZE', codigo: '18279813055465' },
+      material: { nome: 'GAZE', codigo_barras: '18279813055465' },
       lote: '2026-01-31',
       validade: '20/07/2029',
       quantidade: 10,
@@ -30,6 +33,16 @@ export default function PreVisualizacaoEtiquetaProfessor() {
   }, [location.state]);
 
   const [qtdEtiquetas, setQtdEtiquetas] = useState(dados.quantidade);
+  const [qrCodeReal, setQrCodeReal] = useState('');
+
+  // Busca o QR code real gerado pelo backend para este material
+  useEffect(() => {
+    if (dados.material?.id) {
+      api.get(`/materiais/${dados.material.id}/qrcode`)
+        .then((res) => setQrCodeReal(res.data.qr_code))
+        .catch((err) => console.error('Erro ao gerar QR code:', err));
+    }
+  }, [dados.material?.id]);
 
   // =========================================================================
   // GERADOR REALISTA DE QR CODE (MEMOIZADO)
@@ -37,7 +50,7 @@ export default function PreVisualizacaoEtiquetaProfessor() {
   const qrcodeSVG = useMemo(() => {
     if (!dados.incluirQR) return null;
 
-    const textoUnico = `${dados.material?.nome || ''}${dados.material?.codigo || ''}`;
+    const textoUnico = `${dados.material?.nome || ''}${dados.material?.codigo_barras || ''}`;
     let hash = 0;
     const str = textoUnico || 'gaze';
     for (let i = 0; i < str.length; i++) {
@@ -118,7 +131,7 @@ export default function PreVisualizacaoEtiquetaProfessor() {
   const codigoDeBarrasSVG = useMemo(() => {
     if (!dados.incluirBarra) return null;
 
-    const strCodigo = String(dados.material?.codigo || '000000000000');
+    const strCodigo = String(dados.material?.codigo_barras || '000000000000');
     let padraoLinhas = '';
     for (let i = 0; i < strCodigo.length; i++) {
       const num = parseInt(strCodigo[i], 10) || 1;
@@ -173,7 +186,7 @@ export default function PreVisualizacaoEtiquetaProfessor() {
         validade: dados.validade,
         quantidadeImpressa: qtdEtiquetas,
         dataHora: dataHoraFormatada,
-        usuario: 'Prof. Dr. Ricardo Silva'
+        usuario: usuario?.nome || 'Usuário'
       }
     });
   };
@@ -213,7 +226,11 @@ export default function PreVisualizacaoEtiquetaProfessor() {
               <div className="flex items-center justify-between gap-4 py-3 px-1">
                 {dados.incluirQR && (
                   <div className="w-16 h-16 bg-white flex items-center justify-center shrink-0 p-0.5 border border-gray-100 rounded-md shadow-inner">
-                    {qrcodeSVG}
+                    {qrCodeReal ? (
+                      <img src={qrCodeReal} alt="QR Code do material" className="w-full h-full object-contain" />
+                    ) : (
+                      qrcodeSVG
+                    )}
                   </div>
                 )}
 
@@ -221,7 +238,7 @@ export default function PreVisualizacaoEtiquetaProfessor() {
                   <div className="flex flex-col items-center flex-1 min-w-0">
                     <div className="w-full px-1">{codigoDeBarrasSVG}</div>
                     <span className="text-[10px] font-bold text-gray-950 mt-1 tracking-widest truncate w-full text-center">
-                      {dados.material?.codigo}
+                      {dados.material?.codigo_barras}
                     </span>
                   </div>
                 )}

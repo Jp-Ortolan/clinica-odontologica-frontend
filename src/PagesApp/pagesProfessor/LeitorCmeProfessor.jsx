@@ -62,8 +62,9 @@ export default function LeitorCmeProfessor() {
               formato: decodedResult?.result?.format?.formatName || abaAtiva,
             });
 
-            // Se quiser navegar automaticamente ao ler, basta descomentar a linha abaixo:
-            // navigate('/app/professor/cme/pacote-detalhes', { state: { pacoteId: decodedText } });
+            // O backend não expõe uma rota para buscar um pacote isolado pelo
+            // código lido, então levamos o código como termo de busca na tela
+            // de pacotes esterilizados (que já faz a filtragem local).
           },
           () => {
             // Callback de escaneamento contínuo (frame a frame sem leitura)
@@ -199,10 +200,10 @@ export default function LeitorCmeProfessor() {
             Última leitura
           </h2>
 
-          <div 
+          <div
             onClick={() => {
               if (ultimoCodigoLido?.id) {
-                navigate('/app/professor/cme/pacote-detalhes', { state: { pacoteId: ultimoCodigoLido.id } });
+                navigate('/app/professor/cme/pacotes-esterilizados', { state: { buscaInicial: ultimoCodigoLido.id } });
               }
             }}
             className="border border-slate-200 rounded-2xl p-3 bg-white shadow-xs flex items-center justify-between cursor-pointer hover:bg-slate-50 transition active:scale-[0.99]"

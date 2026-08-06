@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, EyeOff, Info, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Info, ChevronDown, AlertCircle } from 'lucide-react';
+import api from '../../Services/api';
 
 export default function NovoUsuario() {
   const navigate = useNavigate();
 
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -63,18 +66,32 @@ export default function NovoUsuario() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Payload limpo para envio à API (remove formatação de CPF e telefone)
+    setErro('');
+
+    // O backend só aceita nome, cpf, email, senha, perfil (+ telefone,
+    // setor, data_admissao opcionais). Sexo/status/permissões granulares
+    // não existem nesse módulo — o "perfil" é quem define o acesso.
     const payload = {
-      ...formData,
+      nome: formData.nome,
+      email: formData.email,
       cpf: formData.cpf.replace(/\D/g, ''),
-      telefone: formData.telefone.replace(/\D/g, '')
+      telefone: formData.telefone.replace(/\D/g, ''),
+      perfil: formData.perfil,
+      senha: formData.senhaTemporaria,
     };
 
-    console.log('Dados do usuário prontos para a API:', payload);
-    navigate(-1);
+    setSalvando(true);
+    try {
+      await api.post('/usuarios', payload);
+      navigate(-1);
+    } catch (err) {
+      console.error('Erro ao criar usuário:', err);
+      setErro(err.response?.data?.message || 'Não foi possível criar o usuário.');
+    } finally {
+      setSalvando(false);
+    }
   };
 
   return (
@@ -241,7 +258,7 @@ export default function NovoUsuario() {
                     <option value="" disabled hidden>Selecione</option>
                     <option value="professor" className="text-slate-800">Professor</option>
                     <option value="aluno" className="text-slate-800">Aluno</option>
-                    <option value="recepcao" className="text-slate-800">Recepção</option>
+                    <option value="recepcionista" className="text-slate-800">Recepção</option>
                   </select>
                   <ChevronDown size={16} className="absolute right-3 top-3 text-slate-400 pointer-events-none" />
                 </div>
@@ -314,13 +331,21 @@ export default function NovoUsuario() {
             </div>
           </div>
 
+          {erro && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl flex items-center gap-2 font-medium">
+              <AlertCircle size={16} className="shrink-0" />
+              {erro}
+            </div>
+          )}
+
           {/* BOTÃO SALVAR USUÁRIO */}
           <div className="pt-4 pb-2">
             <button
               type="submit"
-              className="w-full bg-[#F9A814] text-slate-950 font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:bg-amber-500 transition active:scale-[0.98] cursor-pointer"
+              disabled={salvando}
+              className="w-full bg-[#F9A814] text-slate-950 font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:bg-amber-500 transition active:scale-[0.98] cursor-pointer disabled:opacity-60"
             >
-              Salvar usuário
+              {salvando ? 'Salvando...' : 'Salvar usuário'}
             </button>
           </div>
 

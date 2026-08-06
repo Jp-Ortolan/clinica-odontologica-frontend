@@ -9,37 +9,7 @@ import {
   MoreVertical,
   Calendar as CalendarIcon
 } from 'lucide-react';
-
-// Chave utilizada para persistência no localStorage
-const STORAGE_KEY_AGENDA = '@app_clinica:agenda_recepcao';
-
-// Dados iniciais de fallback caso o localStorage esteja vazio
-const AGENDAMENTOS_INICIAIS_MOCK = [
-  {
-    id: 1,
-    data: '2026-05-25',
-    hora: '09:30',
-    paciente: 'Ana Maria Silva',
-    procedimento: 'Clareamento Dental',
-    disciplina: 'Dentística'
-  },
-  {
-    id: 2,
-    data: '2026-05-25',
-    hora: '11:40',
-    paciente: 'Carlos Eduardo',
-    procedimento: 'Restauração',
-    disciplina: 'Dentística'
-  },
-  {
-    id: 3,
-    data: '2026-05-25',
-    hora: '13:00',
-    paciente: 'Mariana Costa',
-    procedimento: 'Tratamento de Canal',
-    disciplina: 'Endodontia'
-  }
-];
+import api from '../../Services/api';
 
 export default function AgendaProfessor() {
   const navigate = useNavigate();
@@ -50,56 +20,28 @@ export default function AgendaProfessor() {
   const [menuAbertoId, setMenuAbertoId] = useState(null);
 
   // Estados de Data
-  const [dataAtual, setDataAtual] = useState(new Date(2026, 4, 25)); // Maio/2026
-  const [diaSelecionado, setDiaSelecionado] = useState(25);
+  const [dataAtual, setDataAtual] = useState(new Date());
+  const [diaSelecionado, setDiaSelecionado] = useState(new Date().getDate());
 
-  // Estado Principal da Agenda (Cadastrada pela Recepção)
-  const [agendamentosRecepcao, setAgendamentosRecepcao] = useState([]);
+  // Estado Principal da Agenda (consultas reais do backend)
+  const [consultas, setConsultas] = useState([]);
+  const [pacientesPorId, setPacientesPorId] = useState({});
   const [carregando, setCarregando] = useState(true);
 
-  // Lista de Disciplinas disponíveis
-  const listaDisciplinas = [
-    'Todas as disciplinas',
-    'Dentística',
-    'Endodontia',
-    'Periodontia',
-    'Ortodontia',
-    'Odontopediatria',
-    'Cirurgia Bucal',
-    'Prótese',
-    'Reabilitação Bucal'
-  ];
+  // O backend não tem conceito de "disciplina" em consultas — mantemos
+  // só "Todas as disciplinas" como grupo único e real.
+  const listaDisciplinas = ['Todas as disciplinas'];
 
-  // 1. CARREGAR AGENDAMENOS CADASTRADOS PELA RECEPÇÃO
   useEffect(() => {
-    const carregarAgenda = () => {
-      try {
-        const dadosSalvos = localStorage.getItem(STORAGE_KEY_AGENDA);
-        if (dadosSalvos) {
-          setAgendamentosRecepcao(JSON.parse(dadosSalvos));
-        } else {
-          // Inicializa mock padrão se estiver vazio
-          localStorage.setItem(STORAGE_KEY_AGENDA, JSON.stringify(AGENDAMENTOS_INICIAIS_MOCK));
-          setAgendamentosRecepcao(AGENDAMENTOS_INICIAIS_MOCK);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar agenda cadastrada pela recepção:", error);
-      } finally {
-        setCarregando(false);
-      }
-    };
-
-    carregarAgenda();
-
-    // Ouve alterações no localStorage feitas pela aba/janela da recepção em tempo real
-    const handleStorageChange = (e) => {
-      if (e.key === STORAGE_KEY_AGENDA && e.newValue) {
-        setAgendamentosRecepcao(JSON.parse(e.newValue));
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    Promise.all([api.get('/consultas'), api.get('/pacientes')])
+      .then(([consultasRes, pacientesRes]) => {
+        const nomePorId = {};
+        pacientesRes.data.forEach((p) => { nomePorId[p.id] = p.nome; });
+        setPacientesPorId(nomePorId);
+        setConsultas(consultasRes.data);
+      })
+      .catch((err) => console.error('Erro ao carregar agenda:', err))
+      .finally(() => setCarregando(false));
   }, []);
 
   // Formatação de string de data selecionada YYYY-MM-DD
@@ -110,33 +52,24 @@ export default function AgendaProfessor() {
     return `${ano}-${mes}-${dia}`;
   }, [dataAtual, diaSelecionado]);
 
-  // 2. AGRUPAR E FILTRAR OS AGENDAMENTOS CADASTRADOS
+  // Agrupa as consultas reais do dia selecionado (grupo único "Geral")
   const agendamentosAgrupados = useMemo(() => {
-    // A) Filtra por Data
-    const doDia = agendamentosRecepcao.filter((item) => item.data === stringDataSelecionada);
-
-    // B) Lista de Disciplinas a exibir
-    const disciplinasParaExibir = disciplinaSelecionada === 'Todas as disciplinas'
-      ? listaDisciplinas.filter((d) => d !== 'Todas as disciplinas')
-      : [disciplinaSelecionada];
-
-    // C) Agrupa por disciplina
-    return disciplinasParaExibir.map((disciplina) => {
-      const pacientes = doDia
-        .filter((item) => item.disciplina === disciplina)
-        .map((item) => ({
-          id: item.id,
-          hora: item.hora,
-          nome: item.paciente,
-          procedimento: item.procedimento
-        }));
-
-      return {
-        disciplina,
-        pacientes
-      };
+    const doDia = consultas.filter((item) => {
+      const iso = new Date(item.data_hora).toISOString().split('T')[0];
+      return iso === stringDataSelecionada;
     });
-  }, [agendamentosRecepcao, stringDataSelecionada, disciplinaSelecionada, listaDisciplinas]);
+
+    return [{
+      disciplina: 'Geral',
+      pacientes: doDia.map((item) => ({
+        id: item.id,
+        pacienteId: item.paciente_id,
+        hora: new Date(item.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        nome: pacientesPorId[item.paciente_id] || 'Paciente',
+        procedimento: item.queixa_principal || 'Consulta',
+      })),
+    }];
+  }, [consultas, pacientesPorId, stringDataSelecionada]);
 
   // Utilitários de Data
   const formatarMesAno = (date) => {
@@ -226,28 +159,25 @@ export default function AgendaProfessor() {
               </span>
             ))}
 
-            {[
-              { dia: 24 },
-              { dia: 25 },
-              { dia: 26 },
-              { dia: 27 },
-              { dia: 28 },
-              { dia: 29 },
-              { dia: 30 }
-            ].map((item, idx) => {
-              const eSelecionado = item.dia === diaSelecionado;
+            {(() => {
+              const totalDias = new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 0).getDate();
+              const inicioSemana = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), Math.max(1, diaSelecionado - 3)).getDay();
+              const primeiroDiaExibido = Math.max(1, diaSelecionado - inicioSemana);
+              return Array.from({ length: 7 }, (_, i) => Math.min(totalDias, primeiroDiaExibido + i));
+            })().map((dia, idx) => {
+              const eSelecionado = dia === diaSelecionado;
               return (
                 <div key={idx} className="flex justify-center pt-1">
                   <button
                     type="button"
-                    onClick={() => setDiaSelecionado(item.dia)}
+                    onClick={() => setDiaSelecionado(dia)}
                     className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition cursor-pointer ${
                       eSelecionado
                         ? 'bg-[#3B42B2] text-white shadow-md'
                         : 'text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    {item.dia}
+                    {dia}
                   </button>
                 </div>
               );
@@ -327,17 +257,7 @@ export default function AgendaProfessor() {
                                 type="button"
                                 onClick={() => {
                                   setMenuAbertoId(null);
-                                  navigate(`/app/professor/atendimento/${paciente.id}`);
-                                }}
-                                className="w-full text-left px-3 py-1.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-                              >
-                                Ver atendimento
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMenuAbertoId(null);
-                                  navigate(`/app/professor/pacientes/detalhes/${paciente.id}`);
+                                  navigate('/app/professor/pacientes/detalhes', { state: { paciente: { id: paciente.pacienteId } } });
                                 }}
                                 className="w-full text-left px-3 py-1.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                               >

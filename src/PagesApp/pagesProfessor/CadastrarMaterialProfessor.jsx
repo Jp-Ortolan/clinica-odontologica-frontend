@@ -1,8 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, Calendar, Image, Barcode, X } from 'lucide-react';
-
-const STORAGE_KEY_MATERIAIS = '@app_clinica:materiais_estoque';
+import {
+  ArrowLeft,
+  ChevronDown,
+  Calendar,
+  Image,
+  Barcode,
+  X,
+  Loader2,
+  AlertCircle
+} from 'lucide-react';
+import api from '../../Services/api';
 
 export default function CadastrarMaterialProfessor() {
   const navigate = useNavigate();
@@ -12,6 +20,7 @@ export default function CadastrarMaterialProfessor() {
   const [nome, setNome] = useState('');
   const [codigoBarras, setCodigoBarras] = useState('');
   const [categoria, setCategoria] = useState('');
+  const [categorias, setCategorias] = useState([]);
   const [unidade, setUnidade] = useState('');
   const [estoqueMinimo, setEstoqueMinimo] = useState('');
   const [estoqueIdeal, setEstoqueIdeal] = useState('');
@@ -19,28 +28,21 @@ export default function CadastrarMaterialProfessor() {
   const [fabricante, setFabricante] = useState('');
   const [validade, setValidade] = useState('');
 
-  // Estados para Imagem / Arquivo
+  // O backend exige um categoria_id real (FK) — carrega as categorias
+  // já cadastradas para popular o seletor.
+  useEffect(() => {
+    api.get('/categorias')
+      .then((res) => setCategorias(res.data))
+      .catch((err) => console.error('Erro ao carregar categorias:', err));
+  }, []);
+
+  // Estados de Imagem / Arquivo
   const [arquivo, setArquivo] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
 
-  // Limpa URL temporária para evitar memory leak
-  useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
-
-  // Converter Imagem/Arquivo para Base64 (salvar localmente)
-  const converterParaBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
-    });
-  };
+  // Estados de Controle / API
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
 
   // Gatilho para clicar no input escondido
   const handleAreaImagemClick = () => {
@@ -51,9 +53,14 @@ export default function CadastrarMaterialProfessor() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (file.size > 10 * 1024 * 1024) {
+        setErro('O arquivo deve ter no máximo 10MB.');
+        return;
+      }
+      setErro('');
       setArquivo(file);
 
+      // Se for uma imagem, gera a URL de visualização prévia
       if (file.type.startsWith('image/')) {
         setPreviewUrl(URL.createObjectURL(file));
       } else {
@@ -65,151 +72,123 @@ export default function CadastrarMaterialProfessor() {
   // Remove o arquivo selecionado
   const handleRemoverArquivo = (e) => {
     e.stopPropagation();
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setArquivo(null);
     setPreviewUrl('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // SALVAR NO BANCO / LOCALSTORAGE
+  // Envio do formulário para o backend
   const handleSalvar = async (e) => {
     e.preventDefault();
+    setErro('');
+    setSalvando(true);
 
     try {
-      let imagemBase64 = null;
-      
-      // Se houver arquivo, converte para armazenar no banco/storage
-      if (arquivo && arquivo.type.startsWith('image/')) {
-        imagemBase64 = await converterParaBase64(arquivo);
-      }
-
-      // Estrutura do objeto completo do Material
-      const novoMaterial = {
-        id: Date.now(), // Gera um ID único
-        nome: nome.trim(),
-        codigoBarras: codigoBarras.trim(),
-        categoria,
-        unidade,
-        estoqueAtual: Number(estoqueIdeal) || 0, // Inicia estoque atual com valor ideal
-        estoqueMinimo: Number(estoqueMinimo) || 0,
-        estoqueIdeal: Number(estoqueIdeal) || 0,
-        descricao: descricao.trim(),
-        fabricante: fabricante.trim(),
-        validade: validade || null,
-        imagem: imagemBase64,
-        nomeArquivo: arquivo ? arquivo.name : null,
-        criadoEm: new Date().toISOString()
+      // O backend de materiais não aceita upload de arquivo/imagem —
+      // só os campos cadastrais mesmo.
+      const payload = {
+        nome,
+        codigo_barras: codigoBarras,
+        categoria_id: Number(categoria),
+        unidade_medida: unidade,
+        estoque_minimo: Number(estoqueMinimo),
+        estoque_ideal: estoqueIdeal ? Number(estoqueIdeal) : null,
+        fabricante: fabricante || undefined,
+        validade: validade || undefined,
       };
 
-      // 1. PERSISTÊNCIA EM LOCALSTORAGE (Simulação de Banco)
-      const materiaisExistentes = JSON.parse(localStorage.getItem(STORAGE_KEY_MATERIAIS) || '[]');
-      const novosMateriais = [novoMaterial, ...materiaisExistentes];
-      localStorage.setItem(STORAGE_KEY_MATERIAIS, JSON.stringify(novosMateriais));
+      await api.post('/materiais', payload);
 
-      /* 
-      // 2. EXEMPLO DE ENVIO PARA API BACKEND (REST)
-      // Se tiver backend, comente o LocalStorage acima e use a chamada abaixo:
-      
-      const formData = new FormData();
-      formData.append('nome', nome);
-      formData.append('codigoBarras', codigoBarras);
-      formData.append('categoria', categoria);
-      formData.append('unidade', unidade);
-      formData.append('estoqueMinimo', estoqueMinimo);
-      formData.append('estoqueIdeal', estoqueIdeal);
-      formData.append('descricao', descricao);
-      formData.append('fabricante', fabricante);
-      formData.append('validade', validade);
-      if (arquivo) formData.append('arquivo', arquivo);
-
-      await fetch('https://sua-api.com/materiais', {
-        method: 'POST',
-        body: formData,
-      });
-      */
-
-      // Redireciona para a lista de estoque
+      // Redireciona após salvar com sucesso
       navigate('/app/professor/estoque');
-    } catch (error) {
-      console.error('Erro ao salvar material:', error);
-      alert('Erro ao salvar material. Tente novamente.');
+    } catch (err) {
+      console.error('Erro ao cadastrar material:', err);
+      setErro(err.response?.data?.message || 'Falha ao cadastrar o material. Tente novamente.');
+    } finally {
+      setSalvando(false);
     }
   };
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-white">
-      {/* TOPO FIXO */}
+
+      {/* TOPO FIXO - Novo material */}
       <div className="bg-[#3B44A8] pt-12 pb-6 px-6 text-white flex items-center justify-between shadow-md rounded-b-[24px] shrink-0 select-none">
         <button
           type="button"
           onClick={() => navigate('/app/professor/estoque')}
           className="p-1 hover:bg-white/10 rounded-lg transition active:scale-95 cursor-pointer"
-          aria-label="Voltar para estoque"
         >
           <ArrowLeft size={24} />
         </button>
         <h1 className="text-xl font-bold tracking-wide mr-8">Novo material</h1>
-        <div className="w-6" />
+        <div className="w-6"></div>
       </div>
 
       {/* CONTEÚDO ROLÁVEL - FORMULÁRIO */}
       <form onSubmit={handleSalvar} className="flex-1 overflow-y-auto px-6 py-5 space-y-6 pb-24">
-        
+
+        {/* EXIBIÇÃO DE ERRO SE HOUVER */}
+        {erro && (
+          <div className="p-3.5 bg-red-50 border border-red-200 text-red-600 rounded-xl flex items-center gap-2.5 text-xs font-semibold">
+            <AlertCircle size={18} className="shrink-0" />
+            <span>{erro}</span>
+          </div>
+        )}
+
         {/* SEÇÃO: Informações básicas */}
         <div className="space-y-4">
           <h2 className="text-[#3B44A8] font-bold text-sm tracking-wide">Informações básicas</h2>
 
+          {/* Nome do produto */}
           <div className="space-y-1">
-            <label htmlFor="nome-produto" className="text-gray-700 text-xs font-bold block">
+            <label className="text-gray-700 text-xs font-bold block">
               Nome do produto <span className="text-red-500">*</span>
             </label>
             <input
-              id="nome-produto"
               type="text"
               placeholder="Digite o nome do produto"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-xs transition"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
               required
             />
           </div>
 
+          {/* Código de barras */}
           <div className="space-y-1">
-            <label htmlFor="codigo-barras" className="text-gray-700 text-xs font-bold block">
+            <label className="text-gray-700 text-xs font-bold block">
               Código de barras <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <input
-                id="codigo-barras"
                 type="text"
                 placeholder="Digite ou escaneie o código"
                 value={codigoBarras}
                 onChange={(e) => setCodigoBarras(e.target.value)}
-                className="w-full pl-4 pr-12 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-xs transition"
+                className="w-full pl-4 pr-12 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
                 required
               />
-              <Barcode className="absolute right-4 top-3 text-gray-400 pointer-events-none" size={18} />
+              <Barcode className="absolute right-4 top-3 text-gray-400" size={18} />
             </div>
           </div>
 
+          {/* Categoria */}
           <div className="space-y-1">
-            <label htmlFor="categoria" className="text-gray-700 text-xs font-bold block">
+            <label className="text-gray-700 text-xs font-bold block">
               Categoria <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <select
-                id="categoria"
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 focus:outline-none focus:border-[#3B44A8] shadow-xs transition appearance-none font-medium cursor-pointer"
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 focus:outline-none focus:border-[#3B44A8] shadow-sm transition appearance-none font-medium"
                 required
               >
-                <option value="" disabled>Selecione</option>
-                <option value="cirurgia">Cirurgia</option>
-                <option value="dentistica">Dentística</option>
-                <option value="periodontia">Periodontia</option>
-                <option value="endodontia">Endodontia</option>
-                <option value="ortodontia">Ortodontia</option>
+                <option value="">Selecione</option>
+                {categorias.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                ))}
               </select>
               <ChevronDown className="absolute right-4 top-3.5 text-gray-400 pointer-events-none" size={16} />
             </div>
@@ -220,57 +199,53 @@ export default function CadastrarMaterialProfessor() {
         <div className="space-y-4">
           <h2 className="text-[#3B44A8] font-bold text-sm tracking-wide">Unidade e estoque</h2>
 
+          {/* Unidade de medida */}
           <div className="space-y-1">
-            <label htmlFor="unidade" className="text-gray-700 text-xs font-bold block">
+            <label className="text-gray-700 text-xs font-bold block">
               Unidade de medida <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <select
-                id="unidade"
                 value={unidade}
                 onChange={(e) => setUnidade(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 focus:outline-none focus:border-[#3B44A8] shadow-xs transition appearance-none font-medium cursor-pointer"
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 focus:outline-none focus:border-[#3B44A8] shadow-sm transition appearance-none font-medium"
                 required
               >
-                <option value="" disabled>Selecione</option>
+                <option value="">Selecione</option>
                 <option value="un">Unidade (Un)</option>
                 <option value="cx">Caixa (Cx)</option>
                 <option value="pct">Pacote (Pct)</option>
-                <option value="frasco">Frasco (Fr)</option>
               </select>
               <ChevronDown className="absolute right-4 top-3.5 text-gray-400 pointer-events-none" size={16} />
             </div>
           </div>
 
+          {/* Estoque Mínimo e Ideal */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label htmlFor="estoque-minimo" className="text-gray-700 text-xs font-bold block">
+              <label className="text-gray-700 text-xs font-bold block">
                 Estoque mínimo <span className="text-red-500">*</span>
               </label>
               <input
-                id="estoque-minimo"
                 type="number"
-                min="0"
-                placeholder="Ex: 5"
+                placeholder="Digite a quantidade"
                 value={estoqueMinimo}
                 onChange={(e) => setEstoqueMinimo(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-xs transition"
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
                 required
               />
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="estoque-ideal" className="text-gray-700 text-xs font-bold block">
+              <label className="text-gray-700 text-xs font-bold block">
                 Estoque ideal <span className="text-red-500">*</span>
               </label>
               <input
-                id="estoque-ideal"
                 type="number"
-                min="0"
-                placeholder="Ex: 20"
+                placeholder="Digite a quantidade"
                 value={estoqueIdeal}
                 onChange={(e) => setEstoqueIdeal(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-xs transition"
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
                 required
               />
             </div>
@@ -281,39 +256,39 @@ export default function CadastrarMaterialProfessor() {
         <div className="space-y-4">
           <h2 className="text-[#3B44A8] font-bold text-sm tracking-wide">Detalhes do produto</h2>
 
+          {/* Descrição */}
           <div className="space-y-1">
-            <label htmlFor="descricao" className="text-gray-700 text-xs font-bold block">Descrição</label>
+            <label className="text-gray-700 text-xs font-bold block">Descrição</label>
             <textarea
-              id="descricao"
-              placeholder="Descreva as especificações do produto"
+              placeholder="Descreva o produto"
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
               rows={3}
-              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-xs transition resize-none"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition resize-none"
             />
           </div>
 
+          {/* Fabricante/marca */}
           <div className="space-y-1">
-            <label htmlFor="fabricante" className="text-gray-700 text-xs font-bold block">Fabricante/marca</label>
+            <label className="text-gray-700 text-xs font-bold block">Fabricante/marca</label>
             <input
-              id="fabricante"
               type="text"
               placeholder="Digite o nome do fabricante"
               value={fabricante}
               onChange={(e) => setFabricante(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-xs transition"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
             />
           </div>
 
-          <div className="space-y-1 w-full sm:w-1/2">
-            <label htmlFor="validade" className="text-gray-700 text-xs font-bold block">Data de validade</label>
+          {/* Data de validade */}
+          <div className="space-y-1 w-1/2 pr-1.5">
+            <label className="text-gray-700 text-xs font-bold block">Data de validade</label>
             <div className="relative">
               <input
-                id="validade"
                 type="date"
                 value={validade}
                 onChange={(e) => setValidade(e.target.value)}
-                className="w-full pl-4 pr-10 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 focus:outline-none focus:border-[#3B44A8] shadow-xs transition"
+                className="w-full pl-4 pr-10 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
               />
               <Calendar className="absolute right-3 top-3 text-gray-400 pointer-events-none" size={16} />
             </div>
@@ -329,16 +304,9 @@ export default function CadastrarMaterialProfessor() {
           className="hidden"
         />
 
-        {/* ÁREA DE ADICIONAR IMAGEM */}
+        {/* ÁREA DE ADICIONAR IMAGEM (Borda tracejada dinâmica) */}
         <div
           onClick={handleAreaImagemClick}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              handleAreaImagemClick();
-            }
-          }}
           className={`w-full border-2 border-dashed rounded-2xl p-5 flex flex-col items-center justify-center text-center select-none transition cursor-pointer relative overflow-hidden ${
             arquivo ? 'border-green-500 bg-green-50/10' : 'border-gray-300 bg-gray-50/30 hover:bg-gray-50'
           }`}
@@ -348,11 +316,11 @@ export default function CadastrarMaterialProfessor() {
               {previewUrl ? (
                 <img
                   src={previewUrl}
-                  alt="Pré-visualização do material"
-                  className="w-20 h-20 object-cover rounded-xl border border-gray-200 shadow-xs"
+                  alt="Preview"
+                  className="w-20 h-20 object-cover rounded-xl border border-gray-200 shadow-sm"
                 />
               ) : (
-                <Image className="text-green-600" size={28} />
+                <Image className="text-green-600" size={24} />
               )}
               <div className="text-xs font-bold text-gray-900 max-w-[250px] truncate">
                 {arquivo.name}
@@ -368,7 +336,7 @@ export default function CadastrarMaterialProfessor() {
           ) : (
             <>
               <Image className="text-gray-400 mb-2" size={24} />
-              <span className="text-gray-950 font-bold text-xs block">Adicionar imagem ou documento</span>
+              <span className="text-gray-950 font-bold text-xs block">Adicionar imagem</span>
               <span className="text-gray-400 text-[9px] font-semibold mt-0.5">
                 Formatos aceitos: PDF, JPG, PNG • Tamanho máximo: 10MB
               </span>
@@ -379,9 +347,17 @@ export default function CadastrarMaterialProfessor() {
         {/* BOTÃO SALVAR PRODUTO */}
         <button
           type="submit"
-          className="w-full py-4 bg-[#F9A814] hover:bg-[#e0940f] active:scale-[0.98] rounded-xl font-bold text-white text-xs transition-all shadow-md mt-4 cursor-pointer"
+          disabled={salvando}
+          className="w-full py-4 bg-[#F9A814] hover:bg-[#e0940f] active:scale-[0.98] rounded-xl font-bold text-white text-xs transition-all shadow-md mt-4 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
         >
-          Salvar produto
+          {salvando ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>Salvando material...</span>
+            </>
+          ) : (
+            <span>Salvar produto</span>
+          )}
         </button>
 
       </form>

@@ -14,16 +14,17 @@ export default function ConfigurarEtiqueta() {
     }
   }, [material, navigate]);
 
-  if (!material) return null;
-
-  // Estados com os dados iniciais do material herdado
-  const [lote, setLote] = useState(material.lote || '');
-  const [validade, setValidade] = useState(material.validade ? new Date(material.validade).toLocaleDateString('pt-BR') : '');
+  // Estados com os dados iniciais do material herdado — precisam vir antes de
+  // qualquer retorno condicional para não violar a ordem dos hooks do React.
+  const [lote, setLote] = useState(material?.lote || '');
+  const [validade, setValidade] = useState(material?.validade ? new Date(material.validade).toLocaleDateString('pt-BR') : '');
   const [quantidade, setQuantidade] = useState(10);
   const [localizacao, setLocalizacao] = useState('Centro Universitário Campo Real Guarapuava');
   const [incluirQR, setIncluirQR] = useState(true);
   const [incluirBarra, setIncluirBarra] = useState(true);
   const [modelo, setModelo] = useState('Padrão - 50mm x 30mm');
+
+  if (!material) return null;
 
   const handleGerarVisualizacao = () => {
     navigate('/app/aluno/estoque/pre-visualizacao', {

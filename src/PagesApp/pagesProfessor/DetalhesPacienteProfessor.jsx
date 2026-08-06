@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   SquarePen,
@@ -11,6 +11,7 @@ import {
   FileText,
   Image as ImageIcon
 } from 'lucide-react';
+import api from '../../Services/api';
 
 // Constante de tema para facilidade de manutenção
 const BRAND_COLOR = 'bg-[#3B42B2]';
@@ -19,7 +20,8 @@ const BRAND_BORDER = 'border-[#3B42B2]';
 
 export default function DetalhesPacienteProfessor() {
   const navigate = useNavigate();
-  
+  const location = useLocation();
+
   // Estados de Controle
   const [modoEvolucao, setModoEvolucao] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('resumo'); // 'resumo' | 'historico' | 'documentos'
@@ -27,125 +29,64 @@ export default function DetalhesPacienteProfessor() {
   const [filtroDoc, setFiltroDoc] = useState('todos');
   const [buscaDoc, setBuscaDoc] = useState('');
   const [menuAbertoId, setMenuAbertoId] = useState(null);
+  const [novaEvolucao, setNovaEvolucao] = useState('');
+  const [enviandoEvolucao, setEnviandoEvolucao] = useState(false);
 
-  // Dados Mockados
-  const [paciente] = useState({
-    nomeHeader: 'Rhaya Borges',
-    cpfHeader: '012.123.456-89',
-    status: 'Ativo',
-    nomeCompleto: 'Rhaya Borges',
-    telefone: '(42) 99999-9999',
-    email: 'engs-rhayannatonete@camporeal.edu.br',
-    dataNascimento: '14/02/2005',
-    endereco: {
-      rua: 'Rua Diogo Emanoel de Almeida, 200',
-      bairro: 'Centro',
-      cidadeEstado: 'Guamiranga - PR'
-    },
-    responsavel: {
-      nome: 'Nome do responsável',
-      telefone: '(42) 88888-8888'
-    },
-    ultimoAtendimento: {
-      data: '18/05/2026',
-      procedimento: 'Instalação de Aparelho Fixo',
-      especialidade: 'Ortodontia',
-      professor: 'Prof. Dr. Michel Barros',
-      aluno: 'Isabela Lima'
-    },
-    historico: [
-      {
-        id: 1,
-        data: '18/05/2026',
-        procedimento: 'Instalação de Aparelho Fixo',
-        especialidade: 'Ortodontia',
-        professor: 'Prof. Dr. Michel Barros',
-        aluno: 'Isabela Lima',
-        categoria: 'consultas'
-      },
-      {
-        id: 2,
-        data: '01/07/2024',
-        procedimento: 'Tratamento de Canal',
-        especialidade: 'Endodontia',
-        professor: 'Profª. Dra. Cláudia Silva',
-        aluno: 'Iara Magalhães',
-        categoria: 'consultas'
-      },
-      {
-        id: 3,
-        data: '25/06/2024',
-        procedimento: 'Extração de Siso',
-        especialidade: 'Cirurgia Bucal',
-        professor: 'Profª. Dra. Cláudia Silva',
-        aluno: 'Pedro Pereira',
-        categoria: 'cirurgias'
-      }
-    ],
+  const pacienteId = location.state?.paciente?.id;
+  const [pacienteDb, setPacienteDb] = useState(null);
+  const [evolucoes, setEvolucoes] = useState([]);
+  const [documentosDb, setDocumentosDb] = useState([]);
+
+  const carregarDados = () => {
+    if (!pacienteId) return;
+    api.get(`/pacientes/${pacienteId}`).then((res) => setPacienteDb(res.data)).catch((err) => console.error(err));
+    api.get(`/pacientes/${pacienteId}/evolucoes`).then((res) => setEvolucoes(res.data)).catch((err) => console.error(err));
+    api.get(`/pacientes/${pacienteId}/documentos`).then((res) => setDocumentosDb(res.data)).catch((err) => console.error(err));
+  };
+
+  useEffect(carregarDados, [pacienteId]);
+
+  const paciente = {
+    nomeHeader: pacienteDb?.nome || 'Carregando...',
+    cpfHeader: pacienteDb?.cpf || '',
+    status: pacienteDb?.ativo === false ? 'Inativo' : 'Ativo',
+    nomeCompleto: pacienteDb?.nome || '',
+    telefone: pacienteDb?.telefone || 'Não informado',
+    email: pacienteDb?.email || 'Não informado',
+    dataNascimento: pacienteDb?.data_nascimento ? new Date(pacienteDb.data_nascimento).toLocaleDateString('pt-BR') : 'Não informada',
+    endereco: pacienteDb?.endereco || 'Não informado',
+    historico: evolucoes,
     evolucao: {
-      ultimoAtendimento: '18/05/2026',
-      totalAtendimentos: 3,
-      linhaDoTempo: [
-        {
-          id: 1,
-          dataTipo: '18/05/2026 - Cirurgia',
-          professor: 'Prof: Dra. Luzia Maria',
-          aluno: 'Aluno: Douglas Henrique',
-          rotulo: 'Procedimento:',
-          descricao: 'Restauração do dente inferior direito.'
-        },
-        {
-          id: 2,
-          dataTipo: '15/05/2026 - Procedimento',
-          professor: 'Prof: Dr. Mário Luiz',
-          aluno: 'Aluno: Ana Maria',
-          rotulo: 'Procedimento:',
-          descricao: 'Radiografia do elemento 26.'
-        },
-        {
-          id: 3,
-          dataTipo: '12/05/2026 - Avaliação',
-          professor: 'Prof: Dr. Sérgio Amaral',
-          aluno: 'Aluno: Olívia Santos',
-          rotulo: 'Queixa principal:',
-          descricao: 'Dor no dente inferior direito.'
-        }
-      ]
+      ultimoAtendimento: evolucoes[0]?.criado_em ? new Date(evolucoes[0].criado_em).toLocaleDateString('pt-BR') : '-',
+      totalAtendimentos: evolucoes.length,
+      linhaDoTempo: evolucoes,
     },
-    documentos: [
-      {
-        id: 1,
-        titulo: 'Radiografia Periapical',
-        subtitulo: 'Elemento 46',
-        data: '18/05/2025',
-        formato: 'JPG',
-        tamanho: '1.2 MB',
-        categoria: 'radiografias'
-      },
-      {
-        id: 2,
-        titulo: 'Exame Clínico',
-        subtitulo: 'Exame Clínico Inicial',
-        data: '01/07/2024',
-        formato: 'PDF',
-        tamanho: '180 KB',
-        categoria: 'exames'
-      }
-    ]
-  });
+    documentos: documentosDb,
+  };
 
-  // Filtros
-  const historicoFiltrado = paciente.historico.filter((item) => {
-    if (filtroHistorico === 'todos') return true;
-    return item.categoria === filtroHistorico;
-  });
+  const handleAdicionarEvolucao = async () => {
+    if (!novaEvolucao.trim()) return;
+    setEnviandoEvolucao(true);
+    try {
+      await api.post(`/pacientes/${pacienteId}/evolucoes`, { descricao: novaEvolucao.trim() });
+      setNovaEvolucao('');
+      carregarDados();
+    } catch (err) {
+      console.error('Erro ao adicionar evolução:', err);
+      alert('Não foi possível salvar a evolução.');
+    } finally {
+      setEnviandoEvolucao(false);
+    }
+  };
+
+  // Filtros (o backend só tem "evolução" — não há categorização por
+  // consultas/cirurgias/exames nesse endpoint, então o filtro só reduz
+  // a "todos" de forma honesta)
+  const historicoFiltrado = filtroHistorico === 'todos' ? paciente.historico : [];
 
   const documentosFiltrados = paciente.documentos.filter((doc) => {
-    const atendeCategoria = filtroDoc === 'todos' || doc.categoria === filtroDoc;
     const buscaLower = buscaDoc.toLowerCase();
-    const atendeBusca = doc.titulo.toLowerCase().includes(buscaLower) || 
-                        doc.subtitulo.toLowerCase().includes(buscaLower);
-    return atendeCategoria && atendeBusca;
+    return (doc.nome_arquivo || '').toLowerCase().includes(buscaLower);
   });
 
   const getHeaderTitle = () => {
@@ -348,16 +289,7 @@ export default function DetalhesPacienteProfessor() {
                     <div>
                       <span className="block font-bold text-slate-900">Endereço</span>
                       <div className="text-slate-500 font-medium leading-tight">
-                        <p>{paciente.endereco.rua}</p>
-                        <p>{paciente.endereco.bairro}</p>
-                        <p>{paciente.endereco.cidadeEstado}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="block font-bold text-slate-900">Responsável</span>
-                      <div className="text-slate-500 font-medium leading-tight">
-                        <p>{paciente.responsavel.nome}</p>
-                        <p>{paciente.responsavel.telefone}</p>
+                        <p>{paciente.endereco || 'Não informado'}</p>
                       </div>
                     </div>
                   </div>
@@ -367,23 +299,21 @@ export default function DetalhesPacienteProfessor() {
                   <div className="p-4 space-y-2">
                     <h3 className={`${BRAND_TEXT} font-extrabold text-sm`}>Últimos atendimentos</h3>
 
-                    <div className="flex items-center justify-between pt-1 cursor-pointer">
-                      <div className="space-y-0.5">
-                        <span className={`${BRAND_TEXT} font-black text-xs block`}>
-                          {paciente.ultimoAtendimento.data}
-                        </span>
-                        <h4 className="font-bold text-slate-900 text-xs">
-                          {paciente.ultimoAtendimento.procedimento}
-                        </h4>
-                        <p className="text-[11px] text-slate-400 font-medium">
-                          {paciente.ultimoAtendimento.especialidade}
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-medium pt-0.5">
-                          {paciente.ultimoAtendimento.professor} • Aluna: {paciente.ultimoAtendimento.aluno}
-                        </p>
+                    {evolucoes.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 font-medium py-2">Nenhum atendimento registrado ainda.</p>
+                    ) : (
+                      <div className="flex items-center justify-between pt-1 cursor-pointer">
+                        <div className="space-y-0.5">
+                          <span className={`${BRAND_TEXT} font-black text-xs block`}>
+                            {new Date(evolucoes[0].criado_em).toLocaleDateString('pt-BR')}
+                          </span>
+                          <h4 className="font-bold text-slate-900 text-xs">
+                            {evolucoes[0].descricao}
+                          </h4>
+                        </div>
+                        <ChevronRight className={`w-5 h-5 ${BRAND_TEXT} shrink-0`} />
                       </div>
-                      <ChevronRight className={`w-5 h-5 ${BRAND_TEXT} shrink-0`} />
-                    </div>
+                    )}
                   </div>
 
                   <button 
@@ -399,43 +329,21 @@ export default function DetalhesPacienteProfessor() {
             {/* ABA: HISTÓRICO */}
             {abaAtiva === 'historico' && (
               <div className="flex-1 flex flex-col space-y-4">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 shrink-0 scrollbar-none">
-                  {['todos', 'consultas', 'cirurgias', 'exames'].map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setFiltroHistorico(cat)}
-                      className={`px-4 py-1.5 rounded-full text-xs font-semibold capitalize transition cursor-pointer shrink-0 ${
-                        filtroHistorico === cat
-                          ? `${BRAND_COLOR} text-white`
-                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-
                 <div className="flex-1">
                   {historicoFiltrado.length > 0 ? (
                     <div className="border border-slate-200 rounded-2xl bg-white shadow-xs divide-y divide-slate-100 overflow-hidden">
                       {historicoFiltrado.map((item) => (
                         <div
                           key={item.id}
-                          className="p-4 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer"
+                          className="p-4 flex items-center justify-between hover:bg-slate-50 transition"
                         >
                           <div className="space-y-0.5">
                             <span className={`${BRAND_TEXT} font-black text-xs block`}>
-                              {item.data}
+                              {new Date(item.criado_em).toLocaleDateString('pt-BR')}
                             </span>
                             <h4 className="font-bold text-slate-900 text-xs">
-                              {item.procedimento}
+                              {item.descricao}
                             </h4>
-                            <p className="text-[11px] text-slate-400 font-medium">
-                              {item.especialidade}
-                            </p>
-                            <p className="text-[10px] text-slate-500 font-medium pt-0.5">
-                              {item.professor} • {item.aluno.includes('Alun') ? item.aluno : `Aluno: ${item.aluno}`}
-                            </p>
                           </div>
                           <ChevronRight className={`w-5 h-5 ${BRAND_TEXT} shrink-0`} />
                         </div>
@@ -443,22 +351,26 @@ export default function DetalhesPacienteProfessor() {
                     </div>
                   ) : (
                     <div className="py-12 text-center text-slate-400">
-                      <p className="font-bold text-xs">Nenhum atendimento nesta categoria</p>
+                      <p className="font-bold text-xs">Nenhum atendimento registrado</p>
                     </div>
                   )}
                 </div>
 
-                {/* Ações inferiores */}
-                <div className="grid grid-cols-2 gap-3 pt-2 shrink-0">
-                  <button 
-                    onClick={() => setModoEvolucao(true)}
-                    className={`w-full py-3 px-2 border-2 ${BRAND_BORDER} ${BRAND_TEXT} font-extrabold text-xs rounded-2xl hover:bg-indigo-50 transition cursor-pointer flex items-center justify-center active:scale-95`}
+                {/* Adicionar nova evolução (POST real em /pacientes/:id/evolucoes) */}
+                <div className="space-y-2 pt-2 shrink-0">
+                  <textarea
+                    value={novaEvolucao}
+                    onChange={(e) => setNovaEvolucao(e.target.value)}
+                    placeholder="Descreva o atendimento realizado..."
+                    rows={2}
+                    className="w-full border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:border-[#3B42B2] resize-none"
+                  />
+                  <button
+                    onClick={handleAdicionarEvolucao}
+                    disabled={!novaEvolucao.trim() || enviandoEvolucao}
+                    className="w-full py-3 px-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-2xl transition cursor-pointer flex items-center justify-center gap-1 shadow-sm active:scale-95"
                   >
-                    Ver evolução
-                  </button>
-
-                  <button className="w-full py-3 px-2 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl transition cursor-pointer flex items-center justify-center gap-1 shadow-sm active:scale-95">
-                    + Adicionar atendimento
+                    {enviandoEvolucao ? 'Salvando...' : '+ Adicionar atendimento'}
                   </button>
                 </div>
               </div>
@@ -515,52 +427,58 @@ export default function DetalhesPacienteProfessor() {
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-11 h-11 rounded-xl bg-indigo-50 border border-indigo-100 flex flex-col items-center justify-center shrink-0">
-                            {doc.formato === 'JPG' ? (
+                            {(doc.tipo_arquivo || '').startsWith('image/') ? (
                               <ImageIcon className={`w-5 h-5 ${BRAND_TEXT}`} />
                             ) : (
                               <FileText className={`w-5 h-5 ${BRAND_TEXT}`} />
                             )}
                             <span className={`text-[9px] font-black ${BRAND_TEXT} mt-0.5 leading-none`}>
-                              {doc.formato}
+                              {(doc.tipo_arquivo || 'PDF').split('/')[1]?.toUpperCase() || 'PDF'}
                             </span>
                           </div>
 
                           <div>
                             <h4 className="font-extrabold text-slate-900 text-xs">
-                              {doc.titulo}
+                              {doc.nome_arquivo}
                             </h4>
-                            <p className="text-[11px] text-slate-400 font-medium">
-                              {doc.subtitulo}
-                            </p>
                             <p className="text-[10px] text-slate-400 font-medium">
-                              {doc.data}
+                              {doc.criado_em ? new Date(doc.criado_em).toLocaleDateString('pt-BR') : ''}
                             </p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
                           <div className="text-right">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase block">
-                              {doc.formato}
-                            </span>
                             <span className="text-[10px] text-slate-400 font-medium">
-                              {doc.tamanho}
+                              {doc.tamanho_bytes ? `${Math.round(doc.tamanho_bytes / 1024)} KB` : ''}
                             </span>
                           </div>
 
                           <div className="relative z-20">
                             <button
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.stopPropagation();
-                                setMenuAbertoId(menuAbertoId === doc.id ? null : doc.id);
+                                try {
+                                  const resposta = await api.get(`/pacientes/${pacienteId}/documentos/${doc.id}/download`, { responseType: 'blob' });
+                                  const url = window.URL.createObjectURL(new Blob([resposta.data]));
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = doc.nome_arquivo || 'documento';
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  link.remove();
+                                  window.URL.revokeObjectURL(url);
+                                } catch (err) {
+                                  console.error('Erro ao baixar documento:', err);
+                                }
                               }}
                               className="p-1 hover:bg-slate-100 rounded-full transition cursor-pointer"
-                              aria-label="Mais opções"
+                              aria-label="Baixar documento"
                             >
                               <MoreVertical className="w-5 h-5 text-slate-600" />
                             </button>
 
-                            {menuAbertoId === doc.id && (
+                            {false && (
                               <div className="absolute right-0 top-7 w-36 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-30">
                                 <button
                                   onClick={() => setMenuAbertoId(null)}

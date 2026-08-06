@@ -1,37 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Calendar, Minus, Plus, ChevronDown, Eye } from 'lucide-react';
+import { ArrowLeft, Calendar, Minus, Plus, ChevronDown, Eye, Package } from 'lucide-react';
 
 export default function ConfigurarEtiquetaProfessor() {
   const navigate = useNavigate();
   const location = useLocation();
+  const material = location.state?.material;
 
-  // Recebe o material vindo da navegação ou carrega um estado fallback para testes
-  const material = location.state?.material || {
-    nome: 'Material Selecionado',
-    codigo: '0000000000',
-    quantidade: 0,
-    lote: '',
-    val: '',
-    imagem: ''
-  };
-
-  // Redireciona de volta com segurança caso o estado seja completamente ausente
+  // Redireciona de volta com segurança caso o estado seja perdido ou acessado direto pela URL
   useEffect(() => {
-    if (!location.state?.material) {
-      // Se preferir bloquear acessos diretos sem dados, descomente a linha abaixo:
-      // navigate('/app/professor/estoque/materiais', { replace: true });
+    if (!material) {
+      navigate('/app/professor/estoque/materiais', { replace: true });
     }
-  }, [location.state, navigate]);
+  }, [material, navigate]);
 
-  // Estados com os dados iniciais do material herdado
-  const [lote, setLote] = useState(material.lote || '2026-05-15');
-  const [validade, setValidade] = useState(material.val || '15/04/2030');
+  // Estados com os dados iniciais do material herdado — precisam vir antes de
+  // qualquer retorno condicional para não violar a ordem dos hooks do React.
+  const [lote, setLote] = useState(material?.lote || '');
+  const [validade, setValidade] = useState(material?.validade ? new Date(material.validade).toLocaleDateString('pt-BR') : '');
   const [quantidade, setQuantidade] = useState(10);
   const [localizacao, setLocalizacao] = useState('Centro Universitário Campo Real Guarapuava');
   const [incluirQR, setIncluirQR] = useState(true);
   const [incluirBarra, setIncluirBarra] = useState(true);
   const [modelo, setModelo] = useState('Padrão - 50mm x 30mm');
+
+  if (!material) return null;
 
   // Avançar para pré-visualização
   const handleGerarPreVisualizacao = () => {
@@ -75,23 +68,15 @@ export default function ConfigurarEtiquetaProfessor() {
             Material selecionado
           </h2>
           <div className="bg-white border border-gray-150 rounded-2xl p-4 shadow-sm flex gap-4 items-center">
-            {material.imagem ? (
-              <img 
-                src={material.imagem} 
-                alt={material.nome} 
-                className="w-16 h-16 rounded-xl object-cover bg-gray-50 border border-gray-150 shrink-0" 
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xl shrink-0">
-                📦
-              </div>
-            )}
+            <div className="w-16 h-16 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 shrink-0">
+              <Package size={28} />
+            </div>
             <div className="flex-1 min-w-0 text-[11px] text-gray-500 font-semibold space-y-0.5">
               <h3 className="font-bold text-gray-900 text-sm leading-tight truncate mb-0.5">
                 {material.nome}
               </h3>
-              <p><span className="text-gray-950 font-bold">Código:</span> {material.codigo || material.codigoBarras || 'N/A'}</p>
-              <p><span className="text-gray-950 font-bold">Estoque:</span> {material.quantidade || material.estoqueAtual || 0}</p>
+              <p><span className="text-gray-950 font-bold">Código:</span> {material.codigo_barras || 'N/A'}</p>
+              <p><span className="text-gray-950 font-bold">Estoque:</span> {material.quantidade || 0}</p>
             </div>
           </div>
         </div>

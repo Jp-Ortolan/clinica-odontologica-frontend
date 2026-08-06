@@ -1,10 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
   ChevronRight,
-  MapPin,
   Info,
   Home,
   Users,
@@ -13,12 +12,27 @@ import {
   Scissors,
   User
 } from 'lucide-react';
+import api from '../../Services/api';
 
 export default function GerenciadorCirurgias() {
   const navigate = useNavigate();
 
   // Estado com a data selecionada
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
+  const [cirurgias, setCirurgias] = useState([]);
+  const [pacientesPorId, setPacientesPorId] = useState({});
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/cirurgias'),
+      api.get('/pacientes'),
+    ]).then(([cirurgiasRes, pacientesRes]) => {
+      const nomePorId = {};
+      pacientesRes.data.forEach((p) => { nomePorId[p.id] = p.nome; });
+      setPacientesPorId(nomePorId);
+      setCirurgias(cirurgiasRes.data);
+    }).catch((err) => console.error('Erro ao carregar cirurgias:', err));
+  }, []);
 
   // Converte objeto Date para string YYYY-MM-DD no fuso horário local
   const formatDateToInputValue = (date) => {
@@ -28,10 +42,10 @@ export default function GerenciadorCirurgias() {
     return `${year}-${month}-${day}`;
   };
 
-  // Formatação em extensão "Hoje, 28 de Julho de 2026"
+  // Formatação em extenso "Hoje, 28 de Julho de 2026"
   const formatarDataExtenso = (date) => {
     const hoje = new Date();
-    const ehHoje = 
+    const ehHoje =
       date.getDate() === hoje.getDate() &&
       date.getMonth() === hoje.getMonth() &&
       date.getFullYear() === hoje.getFullYear();
@@ -41,7 +55,7 @@ export default function GerenciadorCirurgias() {
       month: 'long',
       year: 'numeric'
     });
-    
+
     const partes = dataFormatada.split(' de ');
     if (partes[1]) {
       partes[1] = partes[1].charAt(0).toUpperCase() + partes[1].slice(1);
@@ -66,42 +80,36 @@ export default function GerenciadorCirurgias() {
     }
   };
 
-  const [cirurgias] = useState([
-    {
-      id: 1,
-      horario: '08:30',
-      paciente: 'Rhaya Borges',
-      procedimento: 'Exodontia - 36',
-      professor: 'Prof: Dr. Carlos Eduardo',
-      local: 'Centro Cirúrgico',
-      status: 'confirmada'
-    },
-    {
-      id: 2,
-      horario: '15:30',
-      paciente: 'Nome do paciente',
-      procedimento: 'Extração de siso',
-      professor: 'Prof: Dra. Ana Maria',
-      local: 'Centro Cirúrgico',
-      status: 'pendente'
-    }
-  ]);
+  // Filtra as cirurgias reais pela data selecionada
+  const cirurgiasDoDia = cirurgias
+    .filter((c) => {
+      const d = new Date(c.data_hora);
+      return d.getDate() === dataSelecionada.getDate() &&
+        d.getMonth() === dataSelecionada.getMonth() &&
+        d.getFullYear() === dataSelecionada.getFullYear();
+    })
+    .map((c) => ({
+      id: c.id,
+      horario: new Date(c.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      paciente: pacientesPorId[c.paciente_id] || 'Paciente',
+      procedimento: c.tipo_cirurgia || 'Cirurgia',
+      status: c.status,
+      dadosOriginais: c,
+    }));
 
-  // Contadores dinâmicos baseados na lista
-  const resumo = useMemo(() => {
-    return {
-      total: cirurgias.length,
-      concluidas: cirurgias.filter(c => c.status === 'concluida').length,
-      pendentes: cirurgias.filter(c => c.status === 'pendente').length
-    };
-  }, [cirurgias]);
+  // Contadores dinâmicos baseados na lista real
+  const resumo = {
+    total: cirurgiasDoDia.length,
+    concluidas: cirurgiasDoDia.filter(c => c.status === 'realizada').length,
+    pendentes: cirurgiasDoDia.filter(c => c.status === 'agendada').length
+  };
 
   return (
     <div className="w-full h-full min-h-screen bg-[#3B42B2] text-white flex flex-col justify-between font-sans m-0 p-0 overflow-x-hidden">
-      
+
       {/* Topo / Header */}
       <header className="pt-6 pb-4 px-4 flex items-center justify-between">
-        <button 
+        <button
           onClick={handleVoltar}
           className="p-2 hover:bg-white/10 rounded-full transition cursor-pointer active:scale-95"
           aria-label="Voltar"
@@ -115,7 +123,7 @@ export default function GerenciadorCirurgias() {
 
       {/* Corpo Principal */}
       <main className="bg-white text-slate-800 rounded-t-[32px] px-4 pt-6 pb-6 flex-1 flex flex-col space-y-4">
-        
+
         {/* Seletor 1: Data Dinâmica */}
         <div className="relative flex items-center justify-between border border-slate-200 rounded-2xl px-4 py-3 bg-white shadow-sm hover:border-indigo-300 transition">
           <span className="text-[#3B42B2] font-semibold text-sm">
@@ -123,7 +131,7 @@ export default function GerenciadorCirurgias() {
           </span>
           <CalendarIcon className="w-5 h-5 text-[#3B42B2]" />
 
-          <input 
+          <input
             type="date"
             value={formatDateToInputValue(dataSelecionada)}
             onChange={handleDataChange}
@@ -133,7 +141,7 @@ export default function GerenciadorCirurgias() {
         </div>
 
         {/* Seletor 2: Mutirão Cirúrgico */}
-        <button 
+        <button
           type="button"
           onClick={() => navigate('/app/professor/mutirao')}
           className="w-full flex items-center justify-between border border-slate-200 rounded-2xl px-4 py-3 bg-white shadow-sm hover:border-indigo-300 transition cursor-pointer active:scale-[0.99] text-left"
@@ -167,39 +175,45 @@ export default function GerenciadorCirurgias() {
 
         {/* Lista de Cirurgias */}
         <div className="border border-slate-200 rounded-2xl bg-white shadow-sm divide-y divide-slate-100 overflow-hidden">
-          {cirurgias.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => navigate('/app/professor/cirurgias/detalhes', { state: { cirurgiaId: item.id } })}
-              className="p-3.5 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer gap-2"
-            >
-              <div className="text-slate-700 font-semibold text-xs pr-3 border-r border-slate-200 whitespace-nowrap">
-                {item.horario}
-              </div>
-
-              <div className="px-1 shrink-0">
-                <div className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center bg-slate-100 text-slate-600">
-                  <User className="w-5 h-5" />
+          {cirurgiasDoDia.length === 0 ? (
+            <div className="p-6 text-center text-slate-400 text-xs font-semibold">Nenhuma cirurgia nesta data.</div>
+          ) : (
+            cirurgiasDoDia.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => navigate('/app/professor/cirurgias/detalhes', { state: { cirurgia: item.dadosOriginais } })}
+                className="p-3.5 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer gap-2"
+              >
+                <div className="text-slate-700 font-semibold text-xs pr-3 border-r border-slate-200 whitespace-nowrap">
+                  {item.horario}
                 </div>
-              </div>
 
-              <div className="flex-1 min-w-0">
-                <h2 className="font-bold text-slate-900 text-sm leading-tight truncate">
-                  {item.paciente}
-                </h2>
-                <p className="text-xs font-semibold text-[#6268D2] truncate">
-                  {item.procedimento}
-                </p>
-                <p className="text-[11px] text-slate-500 truncate">{item.professor}</p>
-                <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
-                  <MapPin className="w-3 h-3 text-[#3B42B2] shrink-0" />
-                  <span className="truncate">{item.local}</span>
+                <div className="px-1 shrink-0">
+                  <div className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center bg-slate-100 text-slate-600">
+                    <User className="w-5 h-5" />
+                  </div>
                 </div>
-              </div>
 
-              <ChevronRight className="w-5 h-5 text-[#3B42B2] shrink-0" />
-            </div>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-bold text-slate-900 text-sm leading-tight truncate">
+                    {item.paciente}
+                  </h2>
+                  <p className="text-xs font-semibold text-[#6268D2] truncate">
+                    {item.procedimento}
+                  </p>
+                  <span className={`inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                    item.status === 'realizada' ? 'bg-emerald-100 text-emerald-700' :
+                    item.status === 'cancelada' ? 'bg-rose-100 text-rose-700' :
+                    'bg-amber-100 text-amber-700'
+                  }`}>
+                    {item.status}
+                  </span>
+                </div>
+
+                <ChevronRight className="w-5 h-5 text-[#3B42B2] shrink-0" />
+              </div>
+            ))
+          )}
         </div>
 
         {/* Alert Box no Rodapé */}

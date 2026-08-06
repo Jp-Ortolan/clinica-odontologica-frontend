@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, History, Keyboard, Barcode, X, Camera, CheckCircle2, Copy } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import api from '../../Services/api';
 
 export default function LeitorScannerProfessor() {
   const navigate = useNavigate();
@@ -93,7 +94,7 @@ export default function LeitorScannerProfessor() {
     };
   }, [abaAtiva]);
 
-  const processarLeitura = (codigo, tipo) => {
+  const processarLeitura = async (codigo, tipo) => {
     const novaLeitura = {
       id: codigo,
       tipo,
@@ -102,8 +103,21 @@ export default function LeitorScannerProfessor() {
 
     setHistoricoLeituras((prev) => [novaLeitura, ...prev]);
 
-    // Redireciona para ação no Estoque
-    navigate('/app/professor/estoque/item-detalhes', { state: { codigo } });
+    // Busca o material real pelo código lido/digitado e vai para a tela de detalhes
+    try {
+      const resposta = await api.get('/materiais', { params: { busca: codigo } });
+      const encontrado = resposta.data.find((m) => m.codigo_barras === codigo) || resposta.data[0];
+
+      if (!encontrado) {
+        setErroCamera('Nenhum material encontrado com esse código.');
+        return;
+      }
+
+      navigate('/app/professor/estoque/detalhes', { state: { material: encontrado } });
+    } catch (err) {
+      console.error('Erro ao buscar material:', err);
+      setErroCamera('Erro ao buscar material pelo código lido.');
+    }
   };
 
   const handleSubmeterManual = (e) => {

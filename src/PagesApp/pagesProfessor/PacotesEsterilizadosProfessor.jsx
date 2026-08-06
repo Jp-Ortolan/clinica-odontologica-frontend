@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   ChevronRight,
@@ -9,56 +9,26 @@ import {
   Package,
   X
 } from 'lucide-react';
+import api from '../../Services/api';
 
-// Lista de dados mockados
-const MOCK_PACOTES = [
-  {
-    id: '1',
-    nome: 'Kit Cirúrgico 01',
-    codigo: '125794215546',
-    autoclave: '01',
-    ciclo: '2548',
-    data: '20/05/2026 - 09:30',
-    status: 'Válido',
-    tipo: 'Kit Cirúrgico'
-  },
-  {
-    id: '2',
-    nome: 'Kit Cirúrgico 03',
-    codigo: '4687913200005',
-    autoclave: '03',
-    ciclo: '2548',
-    data: '20/05/2026 - 09:34',
-    status: 'Válido',
-    tipo: 'Kit Cirúrgico'
-  },
-  {
-    id: '3',
-    nome: 'Campo Fenestrado 02',
-    codigo: '9876543210012',
-    autoclave: '02',
-    ciclo: '2545',
-    data: '18/05/2026 - 14:20',
-    status: 'Vencido',
-    tipo: 'Campo'
-  },
-  {
-    id: '4',
-    nome: 'Bandeja de Diagnóstico',
-    codigo: '1122334455667',
-    autoclave: '01',
-    ciclo: '2540',
-    data: '15/05/2026 - 11:00',
-    status: 'Em Uso',
-    tipo: 'Instrumental'
-  }
-];
+const STATUS_LABEL = {
+  esterilizado: 'Válido',
+  vencido: 'Vencido',
+  utilizado: 'Utilizado',
+};
+
+const TIPO_CICLO_LABEL = {
+  vapor: 'Vapor',
+  calor_seco: 'Calor seco',
+  plasma: 'Plasma',
+};
 
 export default function PacotesEsterilizadosProfessor() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ESTADOS DE BUSCA E SELEÇÃO DE FILTROS
-  const [busca, setBusca] = useState('');
+  const [busca, setBusca] = useState(location.state?.buscaInicial || '');
   const [statusFiltro, setStatusFiltro] = useState('Todos');
   const [tipoFiltro, setTipoFiltro] = useState('Todos');
 
@@ -66,11 +36,15 @@ export default function PacotesEsterilizadosProfessor() {
   const [openStatus, setOpenStatus] = useState(false);
   const [openTipo, setOpenTipo] = useState(false);
 
+  // DADOS REAIS
+  const [pacotes, setPacotes] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
   // REFERÊNCIAS PARA DETECTAR CLIQUE FORA
   const dropdownRef = useRef(null);
 
-  const opcoesStatus = ['Todos', 'Válido', 'Vencido', 'Em Uso'];
-  const opcoesTipo = ['Todos', 'Kit Cirúrgico', 'Campo', 'Instrumental'];
+  const opcoesStatus = ['Todos', 'esterilizado', 'vencido', 'utilizado'];
+  const opcoesTipo = ['Todos', 'vapor', 'calor_seco', 'plasma'];
 
   // Fecha os dropdowns ao clicar fora do contêiner de filtros
   useEffect(() => {
@@ -84,24 +58,42 @@ export default function PacotesEsterilizadosProfessor() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Carrega todos os ciclos e, para cada um, seus pacotes (sub-recurso do backend)
+  useEffect(() => {
+    api.get('/esterilizacoes')
+      .then(async (res) => {
+        const ciclos = res.data;
+        const resultados = await Promise.all(
+          ciclos.map((c) =>
+            api.get(`/esterilizacoes/${c.id}/pacotes`)
+              .then((r) => r.data.map((p) => ({ ...p, ciclo: c })))
+              .catch(() => [])
+          )
+        );
+        setPacotes(resultados.flat().sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em)));
+      })
+      .catch((err) => console.error('Erro ao carregar pacotes esterilizados:', err))
+      .finally(() => setCarregando(false));
+  }, []);
+
   // LÓGICA DE FILTRAGEM MEMOIZADA
   const pacotesFiltrados = useMemo(() => {
     const termoBusca = busca.toLowerCase().trim();
 
-    return MOCK_PACOTES.filter((item) => {
+    return pacotes.filter((item) => {
       const atendeBusca =
-        item.nome.toLowerCase().includes(termoBusca) ||
-        item.codigo.includes(termoBusca);
+        (item.material_nome || '').toLowerCase().includes(termoBusca) ||
+        String(item.id).includes(termoBusca);
 
       const atendeStatus =
         statusFiltro === 'Todos' || item.status === statusFiltro;
 
       const atendeTipo =
-        tipoFiltro === 'Todos' || item.tipo === tipoFiltro;
+        tipoFiltro === 'Todos' || item.ciclo?.tipo_ciclo === tipoFiltro;
 
       return atendeBusca && atendeStatus && atendeTipo;
     });
-  }, [busca, statusFiltro, tipoFiltro]);
+  }, [pacotes, busca, statusFiltro, tipoFiltro]);
 
   const handleVoltar = () => {
     if (window.history.length > 2) {
@@ -113,7 +105,7 @@ export default function PacotesEsterilizadosProfessor() {
 
   return (
     <div className="w-full h-full min-h-screen bg-[#3B42B2] text-white flex flex-col font-sans m-0 p-0 overflow-x-hidden">
-      
+
       {/* HEADER / TOPO */}
       <div className="pt-8 pb-4 px-4 flex items-center justify-between shrink-0">
         <button
@@ -131,7 +123,7 @@ export default function PacotesEsterilizadosProfessor() {
 
       {/* CARD PRINCIPAL BRANCO COM SCROLL */}
       <div className="bg-white text-slate-800 rounded-t-[32px] px-4 pt-5 pb-8 flex-1 flex flex-col space-y-4 shadow-inner relative">
-        
+
         {/* BARRA DE PESQUISA */}
         <div className="relative w-full">
           <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -155,13 +147,13 @@ export default function PacotesEsterilizadosProfessor() {
 
         {/* SELETORES EM MODO DROPDOWN / REFLUXO */}
         <div ref={dropdownRef} className="grid grid-cols-2 gap-3 relative z-10">
-          
+
           {/* 1. SELETOR DE STATUS */}
           <div className="relative">
             <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
               Status:
             </label>
-            
+
             <button
               onClick={() => {
                 setOpenStatus(!openStatus);
@@ -169,7 +161,7 @@ export default function PacotesEsterilizadosProfessor() {
               }}
               className="w-full bg-slate-100 border border-slate-200 text-[#3B42B2] font-extrabold text-xs px-3 py-2 rounded-xl flex items-center justify-between shadow-xs cursor-pointer active:scale-98 transition"
             >
-              <span className="truncate">{statusFiltro}</span>
+              <span className="truncate">{statusFiltro === 'Todos' ? 'Todos' : STATUS_LABEL[statusFiltro]}</span>
               <ChevronDown className={`w-4 h-4 text-[#3B42B2] transition-transform duration-200 shrink-0 ${openStatus ? 'rotate-180' : ''}`} />
             </button>
 
@@ -188,7 +180,7 @@ export default function PacotesEsterilizadosProfessor() {
                         : 'text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    <span>{st}</span>
+                    <span>{st === 'Todos' ? 'Todos' : STATUS_LABEL[st]}</span>
                     {statusFiltro === st && <Check className="w-3.5 h-3.5 shrink-0" />}
                   </button>
                 ))}
@@ -196,12 +188,12 @@ export default function PacotesEsterilizadosProfessor() {
             )}
           </div>
 
-          {/* 2. SELETOR DE TIPO */}
+          {/* 2. SELETOR DE TIPO DE CICLO */}
           <div className="relative">
             <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
-              Tipo:
+              Tipo de ciclo:
             </label>
-            
+
             <button
               onClick={() => {
                 setOpenTipo(!openTipo);
@@ -209,7 +201,7 @@ export default function PacotesEsterilizadosProfessor() {
               }}
               className="w-full bg-slate-100 border border-slate-200 text-[#3B42B2] font-extrabold text-xs px-3 py-2 rounded-xl flex items-center justify-between shadow-xs cursor-pointer active:scale-98 transition"
             >
-              <span className="truncate">{tipoFiltro}</span>
+              <span className="truncate">{tipoFiltro === 'Todos' ? 'Todos' : TIPO_CICLO_LABEL[tipoFiltro]}</span>
               <ChevronDown className={`w-4 h-4 text-[#3B42B2] transition-transform duration-200 shrink-0 ${openTipo ? 'rotate-180' : ''}`} />
             </button>
 
@@ -228,7 +220,7 @@ export default function PacotesEsterilizadosProfessor() {
                         : 'text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    <span className="truncate">{tp}</span>
+                    <span className="truncate">{tp === 'Todos' ? 'Todos' : TIPO_CICLO_LABEL[tp]}</span>
                     {tipoFiltro === tp && <Check className="w-3.5 h-3.5 shrink-0" />}
                   </button>
                 ))}
@@ -240,7 +232,9 @@ export default function PacotesEsterilizadosProfessor() {
 
         {/* LISTA DE PACOTES FILTRADOS */}
         <div className="space-y-3 pt-2 flex-1">
-          {pacotesFiltrados.length > 0 ? (
+          {carregando ? (
+            <div className="text-center py-12 text-slate-400 text-xs font-semibold">Carregando pacotes...</div>
+          ) : pacotesFiltrados.length > 0 ? (
             pacotesFiltrados.map((item) => (
               <div
                 key={item.id}
@@ -253,19 +247,16 @@ export default function PacotesEsterilizadosProfessor() {
                   </div>
                   <div className="space-y-0.5 min-w-0">
                     <h4 className="font-extrabold text-[#3B42B2] text-xs truncate">
-                      {item.nome}
+                      {item.material_nome}
                     </h4>
                     <p className="text-[9px] text-slate-500 font-bold truncate">
-                      Código: {item.codigo}
+                      Pacote #{item.id}
                     </p>
                     <p className="text-[9px] text-slate-500 font-bold">
-                      Autoclave: {item.autoclave}
-                    </p>
-                    <p className="text-[9px] text-slate-500 font-bold">
-                      Ciclo: {item.ciclo}
+                      Ciclo: {item.esterilizacao_id} ({TIPO_CICLO_LABEL[item.ciclo?.tipo_ciclo] || item.ciclo?.tipo_ciclo || 'N/I'})
                     </p>
                     <p className="text-[8px] text-slate-400 font-medium mt-0.5">
-                      {item.data}
+                      {item.criado_em ? new Date(item.criado_em).toLocaleDateString('pt-BR') : ''}
                     </p>
                   </div>
                 </div>
@@ -273,14 +264,14 @@ export default function PacotesEsterilizadosProfessor() {
                 <div className="flex flex-col items-end justify-between gap-3 shrink-0 self-stretch">
                   <span
                     className={`text-[9px] font-extrabold px-2.5 py-0.5 rounded-full ${
-                      item.status === 'Válido'
+                      item.status === 'esterilizado'
                         ? 'bg-emerald-100 text-emerald-700'
-                        : item.status === 'Vencido'
+                        : item.status === 'vencido'
                         ? 'bg-rose-100 text-rose-700'
                         : 'bg-amber-100 text-amber-700'
                     }`}
                   >
-                    {item.status}
+                    {STATUS_LABEL[item.status] || item.status}
                   </span>
                   <ChevronRight className="w-5 h-5 text-[#3B42B2] transform group-hover:translate-x-0.5 transition-transform" />
                 </div>
