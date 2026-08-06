@@ -8,6 +8,10 @@ import Login from './Login';
 import RecuperarSenha from './RecuperarSenha';
 import RedefinirSenha from './RedefinirSenha';
 
+// Tela de notificações — a mesma para os três perfis (a API só devolve as
+// notificações do usuário logado), montada em uma rota dentro de cada área.
+import Notificacoes from './components/Notificacoes';
+
 // ================= IMPORTS DO ALUNO (MOBILE) =================
 import LayoutAluno from './PagesApp/pagesAlunos/LayoutAluno';
 import DashboardAluno from './PagesApp/pagesAlunos/DashboardAluno';
@@ -106,6 +110,7 @@ export default function App() {
             <Route path="estoque/impressao-concluida" element={<ConcluirImpressaoEtiqueta />} />
             <Route path="agenda/detalhes" element={<DetalhesAtendimento />} />
             <Route path="pacientes/detalhes" element={<DetalhesPacienteAluno />} />
+            <Route path="notificacoes" element={<Notificacoes />} />
             <Route path="configuracoes" element={<Configuracoes />} />
           </Route>
 
@@ -131,6 +136,7 @@ export default function App() {
             <Route path="mutirao" element={<SpacerWrapper><TelaMutiraoCirurgico /></SpacerWrapper>} />
             <Route path="pacientes" element={<PacientesProfessor />} />
             <Route path="pacientes/detalhes" element={<DetalhesPacienteProfessor />} />
+            <Route path="notificacoes" element={<Notificacoes />} />
             <Route path="configuracoes" element={<SettingsManager />} />
             <Route path="configuracoes/novo-usuario" element={<NovoUsuario />} />
 
@@ -165,6 +171,7 @@ export default function App() {
             <Route path="agenda/reagendar" element={<ReagendarConsulta />} />
             <Route path="agenda/cancelar" element={<CancelarConsulta />} />
             <Route path="agenda/novo-agendamento" element={<AgendarConsulta />} />
+            <Route path="notificacoes" element={<Notificacoes />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

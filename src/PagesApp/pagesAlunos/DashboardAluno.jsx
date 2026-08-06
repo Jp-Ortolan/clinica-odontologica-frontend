@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { Settings, Bell, Calendar, ChevronRight, User } from 'lucide-react';
 import api from '../../Services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useContagemNaoLidas } from '../../hooks/useNotificacoes';
 
 export default function DashboardAluno() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
   const [dataAtual, setDataAtual] = useState('');
-  const [temNotificacoes, setTemNotificacoes] = useState(false);
+  // Antes isto era um useState fixo em `false` que nunca era atualizado —
+  // o badge do sino nunca aparecia. Agora vem do backend.
+  const { total: totalNaoLidas } = useContagemNaoLidas();
+  const temNotificacoes = totalNaoLidas > 0;
   const [consultasHoje, setConsultasHoje] = useState([]);
   const [cirurgiasHoje, setCirurgiasHoje] = useState([]);
   const [pacientesPorId, setPacientesPorId] = useState({});

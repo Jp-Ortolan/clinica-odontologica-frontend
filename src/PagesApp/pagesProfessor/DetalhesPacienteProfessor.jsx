@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -31,6 +31,20 @@ export default function DetalhesPacienteProfessor() {
   const [menuAbertoId, setMenuAbertoId] = useState(null);
   const [novaEvolucao, setNovaEvolucao] = useState('');
   const [enviandoEvolucao, setEnviandoEvolucao] = useState(false);
+
+  // Upload de documento (FAB "Enviar"). O backend espera o arquivo em
+  // base64 no corpo do POST — ver pacienteService.criarDocumento.
+  const inputArquivoRef = useRef(null);
+  const [enviandoDocumento, setEnviandoDocumento] = useState(false);
+
+  // Edição do cadastro do paciente (botão do lápis no topo). O professor
+  // não tem uma tela de cadastro própria como a recepção, então a edição
+  // acontece num modal aqui mesmo, via PUT /pacientes/:id.
+  const [editando, setEditando] = useState(false);
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const [formEdicao, setFormEdicao] = useState({
+    nome: '', telefone: '', email: '', endereco: '',
+  });
 
   const pacienteId = location.state?.paciente?.id;
   const [pacienteDb, setPacienteDb] = useState(null);
@@ -76,6 +90,80 @@ export default function DetalhesPacienteProfessor() {
       alert('Não foi possível salvar a evolução.');
     } finally {
       setEnviandoEvolucao(false);
+    }
+  };
+
+  const abrirEdicao = () => {
+    setFormEdicao({
+      nome: pacienteDb?.nome || '',
+      telefone: pacienteDb?.telefone || '',
+      email: pacienteDb?.email || '',
+      endereco: pacienteDb?.endereco || '',
+    });
+    setEditando(true);
+  };
+
+  const salvarEdicao = async () => {
+    if (!formEdicao.nome.trim()) {
+      alert('O nome do paciente é obrigatório.');
+      return;
+    }
+    setSalvandoEdicao(true);
+    try {
+      // Manda o cadastro inteiro: o backend faz UPDATE de todos os campos,
+      // então enviar só os alterados apagaria o resto.
+      await api.put(`/pacientes/${pacienteId}`, {
+        ...pacienteDb,
+        nome: formEdicao.nome.trim(),
+        telefone: formEdicao.telefone.trim(),
+        email: formEdicao.email.trim(),
+        endereco: formEdicao.endereco.trim(),
+      });
+      setEditando(false);
+      carregarDados();
+    } catch (err) {
+      console.error('Erro ao salvar edição do paciente:', err);
+      alert(err.response?.data?.message || 'Não foi possível salvar as alterações.');
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  };
+
+  // Lê o arquivo escolhido e manda pro backend em base64.
+  const handleEnviarDocumento = async (evento) => {
+    const arquivo = evento.target.files?.[0];
+    // Limpa o input pra permitir reenviar o mesmo arquivo depois.
+    evento.target.value = '';
+    if (!arquivo || !pacienteId) return;
+
+    const LIMITE_MB = 10;
+    if (arquivo.size > LIMITE_MB * 1024 * 1024) {
+      alert(`O arquivo excede o limite de ${LIMITE_MB}MB.`);
+      return;
+    }
+
+    setEnviandoDocumento(true);
+    try {
+      const conteudo_base64 = await new Promise((resolve, reject) => {
+        const leitor = new FileReader();
+        // O resultado vem como "data:<tipo>;base64,<conteudo>" — o backend
+        // quer só a parte depois da vírgula.
+        leitor.onload = () => resolve(String(leitor.result).split(',')[1]);
+        leitor.onerror = () => reject(new Error('Falha ao ler o arquivo'));
+        leitor.readAsDataURL(arquivo);
+      });
+
+      await api.post(`/pacientes/${pacienteId}/documentos`, {
+        nome_arquivo: arquivo.name,
+        tipo_arquivo: arquivo.type || 'application/octet-stream',
+        conteudo_base64,
+      });
+      carregarDados();
+    } catch (err) {
+      console.error('Erro ao enviar documento:', err);
+      alert(err.response?.data?.message || 'Não foi possível enviar o documento.');
+    } finally {
+      setEnviandoDocumento(false);
     }
   };
 
@@ -130,9 +218,12 @@ export default function DetalhesPacienteProfessor() {
         </h1>
 
         {!modoEvolucao ? (
-          <button 
-            className="p-2 hover:bg-white/10 rounded-full transition cursor-pointer active:scale-95"
-            aria-label="Editar"
+          <button
+            type="button"
+            onClick={abrirEdicao}
+            disabled={!pacienteDb}
+            className="p-2 hover:bg-white/10 rounded-full transition cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-default"
+            aria-label="Editar cadastro do paciente"
           >
             <SquarePen className="w-5 h-5 text-white" />
           </button>
@@ -507,9 +598,24 @@ export default function DetalhesPacienteProfessor() {
 
                 {/* FAB - Enviar Documento */}
                 <div className="fixed bottom-6 right-6 z-10">
-                  <button className="w-14 h-14 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-lg flex flex-col items-center justify-center transition transform active:scale-95 cursor-pointer">
+                  <input
+                    ref={inputArquivoRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleEnviarDocumento}
+                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => inputArquivoRef.current?.click()}
+                    disabled={enviandoDocumento}
+                    className="w-14 h-14 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 disabled:cursor-wait text-white rounded-full shadow-lg flex flex-col items-center justify-center transition transform active:scale-95 cursor-pointer"
+                    aria-label="Enviar documento"
+                  >
                     <Upload className="w-5 h-5 stroke-[2.5]" />
-                    <span className="text-[9px] font-bold mt-0.5">Enviar</span>
+                    <span className="text-[9px] font-bold mt-0.5">
+                      {enviandoDocumento ? '...' : 'Enviar'}
+                    </span>
                   </button>
                 </div>
 
@@ -519,6 +625,64 @@ export default function DetalhesPacienteProfessor() {
         )}
 
       </main>
+
+      {/* MODAL DE EDIÇÃO DO CADASTRO DO PACIENTE */}
+      {editando && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+          onClick={() => !salvandoEdicao && setEditando(false)}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className={`${BRAND_TEXT} font-black text-sm`}>Editar cadastro</h3>
+              <button
+                type="button"
+                onClick={() => setEditando(false)}
+                disabled={salvandoEdicao}
+                className="text-slate-400 hover:text-slate-600 text-xs font-bold disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+            </div>
+
+            {[
+              { campo: 'nome', rotulo: 'Nome completo', tipo: 'text', obrigatorio: true },
+              { campo: 'telefone', rotulo: 'Telefone', tipo: 'tel' },
+              { campo: 'email', rotulo: 'E-mail', tipo: 'email' },
+              { campo: 'endereco', rotulo: 'Endereço', tipo: 'text' },
+            ].map(({ campo, rotulo, tipo, obrigatorio }) => (
+              <div key={campo} className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                  {rotulo} {obrigatorio && <span className="text-rose-500">*</span>}
+                </label>
+                <input
+                  type={tipo}
+                  value={formEdicao[campo]}
+                  onChange={(e) => setFormEdicao((atual) => ({ ...atual, [campo]: e.target.value }))}
+                  className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium focus:outline-none focus:${BRAND_BORDER}`}
+                />
+              </div>
+            ))}
+
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              CPF e data de nascimento não são editáveis por aqui — são os campos
+              usados para identificar o paciente.
+            </p>
+
+            <button
+              type="button"
+              onClick={salvarEdicao}
+              disabled={salvandoEdicao}
+              className={`w-full py-3 ${BRAND_COLOR} text-white rounded-xl font-bold text-xs transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-wait`}
+            >
+              {salvandoEdicao ? 'Salvando...' : 'Salvar alterações'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

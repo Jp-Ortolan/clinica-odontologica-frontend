@@ -1,14 +1,29 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, BriefcaseMedical, ConciergeBell } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 
 // Importa a sua logo oficial diretamente da pasta de assets conforme sua estrutura física
 import logoOdonto from './assets/images/odontologia-branca-scaled.png';
 
+// Perfis que o usuário escolhe na tela. O `valor` é exatamente o que o
+// backend devolve em usuario.perfil, pra dar pra comparar direto.
+const PERFIS = [
+  { valor: 'aluno', rotulo: 'Aluno', Icone: GraduationCap },
+  { valor: 'professor', rotulo: 'Professor', Icone: BriefcaseMedical },
+  { valor: 'recepcionista', rotulo: 'Recepção', Icone: ConciergeBell },
+];
+
+const ROTULO_PERFIL = {
+  aluno: 'Aluno',
+  professor: 'Professor',
+  recepcionista: 'Recepção',
+};
+
 export default function Login() {
   const navigate = useNavigate();
-  const { login, rotaInicial } = useAuth();
+  const { login, logout, rotaInicial } = useAuth();
+  const [perfilSelecionado, setPerfilSelecionado] = useState(null);
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [showSenha, setShowSenha] = useState(false);
@@ -17,13 +32,31 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // A escolha do perfil é obrigatória e serve como validação: quem
+    // manda de verdade continua sendo o perfil que o backend devolve,
+    // mas se o usuário escolheu errado a gente avisa em vez de jogar
+    // ele numa área que não é a dele.
+    if (!perfilSelecionado) {
+      setErro('Selecione o seu perfil de acesso para continuar.');
+      return;
+    }
+
     setCarregando(true);
     setErro('');
 
     try {
-      // Login de verdade contra o backend — quem define a área de acesso
-      // é o perfil que volta na resposta, não uma escolha manual.
       const usuarioLogado = await login(email, senha);
+
+      if (usuarioLogado.perfil !== perfilSelecionado) {
+        // Credenciais válidas, mas perfil errado. Desfaz a sessão que o
+        // login acabou de gravar no localStorage antes de recusar.
+        logout();
+        const rotuloReal = ROTULO_PERFIL[usuarioLogado.perfil] || usuarioLogado.perfil;
+        setErro(`Esta conta é do perfil "${rotuloReal}". Selecione o perfil correto para entrar.`);
+        return;
+      }
+
       navigate(rotaInicial(usuarioLogado.perfil));
     } catch (err) {
       console.error('Erro ao realizar login:', err);
@@ -72,6 +105,37 @@ export default function Login() {
                 {erro}
               </div>
             )}
+
+            {/* Seleção de perfil de acesso */}
+            <div className="space-y-2">
+              <p className="text-gray-500 text-[11px] font-semibold uppercase tracking-wide">
+                Perfil de acesso
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {PERFIS.map(({ valor, rotulo, Icone }) => {
+                  const ativo = perfilSelecionado === valor;
+                  return (
+                    <button
+                      key={valor}
+                      type="button"
+                      onClick={() => {
+                        setPerfilSelecionado(valor);
+                        setErro('');
+                      }}
+                      aria-pressed={ativo}
+                      className={`flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-xl border text-[11px] font-bold transition-all active:scale-[0.97] ${
+                        ativo
+                          ? 'border-[#3B44A8] bg-[#3B44A8]/5 text-[#3B44A8] ring-1 ring-[#3B44A8]'
+                          : 'border-gray-300 bg-white text-gray-500 hover:border-[#3B44A8]/40 hover:text-gray-700'
+                      }`}
+                    >
+                      <Icone size={18} />
+                      {rotulo}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Input E-mail */}
             <div className="space-y-1">

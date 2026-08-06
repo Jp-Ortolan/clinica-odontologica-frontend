@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Settings, Bell, Calendar, ChevronRight, User, Loader2 } from 'lucide-react';
 import api from '../../Services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useContagemNaoLidas } from '../../hooks/useNotificacoes';
 
 export default function DashboardProfessor() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
+  const { total: totalNaoLidas } = useContagemNaoLidas();
   const [loading, setLoading] = useState(true);
   const [dataAtual, setDataAtual] = useState('');
 
@@ -103,12 +105,16 @@ export default function DashboardProfessor() {
           <p className="text-[#F9A814] text-[10px] font-semibold uppercase tracking-wider">Professor</p>
         </div>
 
-        <button 
+        <button
           type="button"
+          onClick={() => navigate('/app/professor/notificacoes')}
           className="p-1 hover:bg-white/10 rounded-lg transition active:scale-95 relative cursor-pointer"
           aria-label="Notificações"
         >
           <Bell size={22} />
+          {totalNaoLidas > 0 && (
+            <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          )}
         </button>
       </div>
 

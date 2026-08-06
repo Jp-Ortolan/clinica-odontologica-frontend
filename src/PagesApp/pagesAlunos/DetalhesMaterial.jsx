@@ -10,6 +10,9 @@ export default function DetalhesMaterial() {
 
   const [material, setMaterial] = useState(location.state?.material || null);
   const [movimentacoes, setMovimentacoes] = useState([]);
+  // A lista completa já vem do backend; o botão "Ver todas" só alterna
+  // entre mostrar as 5 mais recentes e o histórico inteiro.
+  const [mostrarTodas, setMostrarTodas] = useState(false);
   const materialId = material?.id || paramId;
 
   // Sempre busca o material completo por id — a lista que manda o state
@@ -151,11 +154,13 @@ export default function DetalhesMaterial() {
         <div className="space-y-2">
           <div className="flex justify-between items-center select-none px-1">
             <h3 className="text-[#3B44A8] font-bold text-xs tracking-wide">Últimas movimentações</h3>
-            <button 
-              type="button" 
-              className="text-[#3B44A8] text-[10px] font-bold hover:underline cursor-pointer"
+            <button
+              type="button"
+              onClick={() => setMostrarTodas((atual) => !atual)}
+              disabled={movimentacoes.length <= 5}
+              className="text-[#3B44A8] text-[10px] font-bold hover:underline cursor-pointer disabled:opacity-40 disabled:cursor-default disabled:no-underline"
             >
-              Ver todas
+              {mostrarTodas ? 'Ver menos' : `Ver todas${movimentacoes.length > 5 ? ` (${movimentacoes.length})` : ''}`}
             </button>
           </div>
 
@@ -163,7 +168,7 @@ export default function DetalhesMaterial() {
             {movimentacoes.length === 0 ? (
               <div className="p-4 text-center text-gray-400 text-[10px]">Nenhuma movimentação registrada.</div>
             ) : (
-              movimentacoes.slice(0, 5).map((mov) => {
+              (mostrarTodas ? movimentacoes : movimentacoes.slice(0, 5)).map((mov) => {
                 const isEntrada = mov.tipo === 'entrada';
                 return (
                   <div key={mov.id} className="p-3.5 flex items-center justify-between text-[10px]">

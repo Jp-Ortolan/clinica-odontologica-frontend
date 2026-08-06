@@ -169,7 +169,7 @@ export default function AgendarConsulta() {
               {/* BOTÃO ADICIONAR NOVO PACIENTE */}
               <button 
                 type="button"
-                onClick={() => navigate('/app/recepcao/pacientes/novo')}
+                onClick={() => navigate('/app/recepcao/pacientes/cadastro')}
                 className="bg-white border border-dashed border-gray-300 hover:border-[#3B44A8] hover:bg-blue-50/30 text-gray-600 hover:text-[#3B44A8] font-bold text-xs px-4 rounded-xl flex items-center gap-2 transition-all shrink-0 shadow-sm"
               >
                 <UserPlus size={16} />
@@ -250,7 +250,11 @@ export default function AgendarConsulta() {
               <span className="w-px h-4 bg-gray-200" />
               <button 
                 type="button" 
-                onClick={() => navigate(`/app/recepcao/pacientes/${pacienteSelecionado.id}`)}
+                onClick={() =>
+                  navigate('/app/recepcao/pacientes/detalhes', {
+                    state: { paciente: pacienteSelecionado },
+                  })
+                }
                 className="text-[#3B44A8] text-xs font-bold flex items-center gap-0.5 hover:underline"
               >
                 Ver histórico <ChevronRight size={14} />

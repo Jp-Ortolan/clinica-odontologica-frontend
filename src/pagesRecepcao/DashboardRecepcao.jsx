@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar as CalendarIcon, Bell, CheckCircle2, AlertCircle, XCircle, RefreshCw, Loader2 } from 'lucide-react';
 import api from '../Services/api'; // Caminho ajustado para a pasta Services
 import { useAuth } from '../context/AuthContext';
+import { useContagemNaoLidas } from '../hooks/useNotificacoes';
 
 export default function DashboardRecepcao() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
+  const { total: totalNaoLidas } = useContagemNaoLidas();
   const [dataAtual, setDataAtual] = useState('');
   
   // Estados dos Dados da API
@@ -114,9 +116,18 @@ export default function DashboardRecepcao() {
           </div>
 
           {/* Notificações */}
-          <button className="p-2.5 bg-gray-50 text-gray-600 hover:text-[#3B44A8] hover:bg-gray-100 rounded-xl transition relative">
+          <button
+            type="button"
+            onClick={() => navigate('/app/recepcao/notificacoes')}
+            className="p-2.5 bg-gray-50 text-gray-600 hover:text-[#3B44A8] hover:bg-gray-100 rounded-xl transition relative"
+            aria-label="Notificações"
+          >
             <Bell size={20} />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
+            {/* O ponto vermelho era fixo no HTML — agora só aparece quando
+                existe notificação não lida de verdade. */}
+            {totalNaoLidas > 0 && (
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full" />
+            )}
           </button>
         </div>
       </header>

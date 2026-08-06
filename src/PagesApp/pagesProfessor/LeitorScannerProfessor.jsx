@@ -18,10 +18,11 @@ export default function LeitorScannerProfessor() {
 
   // Estados de Entrada e Histórico
   const [codigoManual, setCodigoManual] = useState('');
-  const [historicoLeituras, setHistoricoLeituras] = useState([
-    { id: '7891234567890', tipo: 'barras', data: '20/05/2026 - 10:15' },
-    { id: 'KIT-EST-092', tipo: 'qrcode', data: '20/05/2026 - 09:40' }
-  ]);
+  // Histórico das leituras feitas nesta sessão. Começa vazio — antes vinha
+  // pré-preenchido com dois códigos de exemplo que pareciam leituras reais.
+  // Não há endpoint de histórico de scanner no backend, então isto é
+  // mesmo só a memória da sessão atual (o do aluno já funcionava assim).
+  const [historicoLeituras, setHistoricoLeituras] = useState([]);
 
   const html5QrcodeRef = useRef(null);
   const readerElementId = 'scanner-viewport';
