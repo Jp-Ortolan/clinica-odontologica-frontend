@@ -43,15 +43,23 @@ export default function SettingsManager({ onClose, onLogout }) {
   // Usuários reais do backend (GET /usuarios)
   const [usuariosData, setUsuariosData] = useState([]);
 
+  // Mesmo formato usado por recarregarUsuarios(), abaixo — inclusive o
+  // campo `ativo`, que a carga inicial não trazia e por isso o selo
+  // "Inativo" nunca aparecia até a lista ser recarregada.
+  const mapearUsuario = (u) => ({
+    id: u.id,
+    nome: u.nome,
+    email: u.email,
+    telefone: u.telefone,
+    setor: u.setor,
+    ativo: u.ativo,
+    perfil: LABEL_PERFIL[u.perfil] || u.perfil,
+    perfilBruto: u.perfil,
+  });
+
   useEffect(() => {
     api.get('/usuarios')
-      .then((res) => setUsuariosData(res.data.map((u) => ({
-        id: u.id,
-        nome: u.nome,
-        email: u.email,
-        perfil: LABEL_PERFIL[u.perfil] || u.perfil,
-        perfilBruto: u.perfil,
-      }))))
+      .then((res) => setUsuariosData(res.data.map(mapearUsuario)))
       .catch((err) => console.error('Erro ao carregar usuários:', err));
   }, [telaInterna]);
 
@@ -149,12 +157,7 @@ export default function SettingsManager({ onClose, onLogout }) {
   // Filtro protegido de usuários
   const recarregarUsuarios = () => {
     api.get('/usuarios')
-      .then((res) => setUsuariosData(res.data.map((u) => ({
-        id: u.id, nome: u.nome, email: u.email, telefone: u.telefone,
-        setor: u.setor, ativo: u.ativo,
-        perfil: u.perfil === 'recepcionista' ? 'Recepção' : u.perfil === 'professor' ? 'Professor' : 'Aluno',
-        perfilBruto: u.perfil,
-      }))))
+      .then((res) => setUsuariosData(res.data.map(mapearUsuario)))
       .catch((err) => console.error('Erro ao recarregar usuários:', err));
   };
 
@@ -410,7 +413,11 @@ export default function SettingsManager({ onClose, onLogout }) {
               />
             </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {['Todos', 'Recepção', 'Administrador', 'Aluno'].map((f) => (
+              {/* Os rótulos precisam bater com o que `perfil` recebe ao carregar
+                  a lista (Professor | Recepção | Aluno). "Administrador" não
+                  existe em lugar nenhum do sistema: filtrar por ele devolvia
+                  sempre uma lista vazia, e não havia como filtrar professores. */}
+              {['Todos', 'Professor', 'Recepção', 'Aluno'].map((f) => (
                 <button
                   key={f}
                   type="button"
@@ -457,16 +464,20 @@ export default function SettingsManager({ onClose, onLogout }) {
                 </div>
               )}
             </div>
-            {filtroUsuarios === 'Todos' && (
-              <button 
-                type="button"
-                onClick={() => navigate('/app/professor/configuracoes/novo-usuario')}
-                className="w-full bg-[#F59E0B] hover:bg-amber-600 active:scale-[0.98] text-white py-3.5 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer mt-2"
-                >
-                <Plus size={18} />
-                <span>Adicionar usuário</span>
-              </button>
-            )}
+            {/* Antes este botão só aparecia com o filtro em "Todos": bastava
+                filtrar por um perfil para o "Adicionar usuário" sumir da tela. */}
+            <button
+              type="button"
+              onClick={() => navigate('/app/professor/configuracoes/novo-usuario')}
+              className="w-full bg-[#F59E0B] hover:bg-amber-600 active:scale-[0.98] text-white py-3.5 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer mt-2"
+            >
+              <Plus size={18} />
+              <span>Adicionar usuário</span>
+            </button>
+
+            <p className="text-center text-[10px] text-gray-400 font-medium pt-1">
+              Toque em um usuário da lista para editar, trocar o perfil ou desativar.
+            </p>
           </div>
         </div>
       )}
