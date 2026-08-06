@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Search, ChevronRight, CloudDownload, Download,
-  ChevronDown, User, Users, ShieldCheck, FileText, FileSearch, LogOut, Plus
+  ArrowLeft, Search, ChevronRight, CloudDownload,
+  User, Users, ShieldCheck, FileText, FileSearch, LogOut, Plus
 } from 'lucide-react';
 import api from '../../Services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -42,96 +42,101 @@ export default function SettingsManager({ onClose, onLogout }) {
         nome: u.nome,
         email: u.email,
         perfil: LABEL_PERFIL[u.perfil] || u.perfil,
+        perfilBruto: u.perfil,
       }))))
       .catch((err) => console.error('Erro ao carregar usuários:', err));
   }, [telaInterna]);
 
-  // Dados Mockados - Perfis
-  const perfis = [
-    { id: 'Administrador', titulo: 'Administrador', desc: 'Acesso total ao sistema', usuarios: '3 usuários' },
-    { id: 'Recepção', titulo: 'Recepção', desc: 'Atendimento e agendamento', usuarios: '6 usuários' },
-    { id: 'Aluno', titulo: 'Aluno', desc: 'Atendimentos clínicos', usuarios: '54 usuários' },
-    { id: 'Professor', titulo: 'Professor', desc: 'Supervisão', usuarios: '9 usuários' },
-  ];
+  // Perfis reais do sistema — o backend só reconhece estes 3 (constraint
+  // chk_usuario_perfil). "Administrador" não existe como perfil aqui.
+  const perfis = ['professor', 'recepcionista', 'aluno'].map((perfilBruto) => ({
+    id: LABEL_PERFIL[perfilBruto],
+    perfilBruto,
+    titulo: LABEL_PERFIL[perfilBruto],
+    usuarios: `${usuariosData.filter((u) => u.perfilBruto === perfilBruto).length} usuários`,
+  }));
 
-  const permissoesPorPerfil = {
-    'Administrador': [
-      { modulo: 'Usuários', nivel: 'Acesso total' },
-      { modulo: 'Pacientes', nivel: 'Acesso total' },
-      { modulo: 'Agenda', nivel: 'Acesso total' },
-      { modulo: 'Estoque', nivel: 'Acesso total' },
-      { modulo: 'CME', nivel: 'Acesso total' },
-      { modulo: 'Relatórios', nivel: 'Acesso total' },
-    ],
-    'Recepção': [
-      { modulo: 'Pacientes', nivel: 'Cadastro e Edição' },
-      { modulo: 'Agenda', nivel: 'Agendamento total' },
-      { modulo: 'Estoque', nivel: 'Apenas leitura' },
-      { modulo: 'Relatórios', nivel: 'Relatórios básicos' },
-    ],
-    'Aluno': [
-      { modulo: 'Pacientes', nivel: 'Consulta e Prontuário' },
-      { modulo: 'Agenda', nivel: 'Consulta de horários' },
-      { modulo: 'Estoque', nivel: 'Solicitação de materiais' },
-      { modulo: 'CME', nivel: 'Envio de kits' },
-    ],
-    'Professor': [
-      { modulo: 'Pacientes', nivel: 'Validação e Supervisão' },
-      { modulo: 'Agenda', nivel: 'Supervisão de agenda' },
-      { modulo: 'Estoque', nivel: 'Aprovação de materiais' },
-      { modulo: 'CME', nivel: 'Aprovação de esterilização' },
-      { modulo: 'Relatórios', nivel: 'Relatórios de desempenho' },
-    ]
-  };
+  // Matriz de permissões real (GET /permissoes) — o mesmo que já está
+  // escrito nas rotas via autorizar(...), só que consultável de uma vez.
+  const [permissoesMatriz, setPermissoesMatriz] = useState([]);
 
-  const backupsDisponiveis = [
-    { dataHora: '13/05/2026 - 07:00', tamanho: '1,2 GB', tipo: 'Automático' },
-    { dataHora: '06/05/2026 - 07:00', tamanho: '1,1 GB', tipo: 'Automático' },
-    { dataHora: '30/04/2026 - 07:00', tamanho: '1,5 GB', tipo: 'Automático' },
-    { dataHora: '23/04/2026 - 07:00', tamanho: '1,0 GB', tipo: 'Automático' },
-  ];
-
-  const dadosLogs = [
-    {
-      data: '20/05/2026',
-      itens: [
-        { usuario: 'Mariana Santos', acao: 'Login realizado com sucesso', hora: '10:45:24', cat: 'Login' },
-        { usuario: 'Pietro Antunes', acao: 'Cadastro de paciente: Luísa Mattos', hora: '09:51:36', cat: 'Cadastro' },
-        { usuario: 'Rafael Silva', acao: 'Alteração de agendamento', hora: '09:53:14', cat: 'Alteração' },
-        { usuario: 'Juliana Mendes', acao: 'Login realizado com sucesso', hora: '09:37:59', cat: 'Login' },
-        { usuario: 'Judite Guimarães', acao: 'Exclusão de agendamento ID: 13456', hora: '09:22:10', cat: 'Exclusão' },
-        { usuario: 'André Marques', acao: 'Login realizado com sucesso', hora: '08:30:32', cat: 'Login' },
-      ]
-    },
-    {
-      data: '19/05/2026',
-      itens: [
-        { usuario: 'Jéssica Ruiz', acao: 'Login realizado com sucesso', hora: '17:37:15', cat: 'Login' },
-        { usuario: 'Débora Andrade', acao: 'Alteração de dados do paciente', hora: '15:17:48', cat: 'Alteração' },
-        { usuario: 'Lucas Emanoel', acao: 'Login realizado com sucesso', hora: '15:17:05', cat: 'Login' },
-      ]
+  useEffect(() => {
+    if (telaInterna === 'permissoes') {
+      api.get('/permissoes')
+        .then((res) => setPermissoesMatriz(res.data))
+        .catch((err) => console.error('Erro ao carregar permissões:', err));
     }
-  ];
+  }, [telaInterna]);
 
-  const dadosAuditoria = [
-    {
-      data: '20/05/2026',
-      itens: [
-        { usuario: 'Mariana Santos', acao: 'Alterou permissões do usuário Marcos Pontes\nAntes: Recepção | Depois: Administrador', hora: '11:08:24', cat: 'Permissões' },
-        { usuario: 'Pietro Antunes', acao: 'Acessou dados da paciente Ana Clara Lima\nProntuário ID: 13456', hora: '11:00:07', cat: 'Dados' },
-        { usuario: 'Juliana Mendes', acao: 'Criou novo agendamento\nPaciente: Bruno Pereira', hora: '10:56:34', cat: 'Dados' },
-        { usuario: 'Judite Guimarães', acao: 'Tentativa de acesso negado\nMódulo: Estoque', hora: '08:47:23', cat: 'Acessos' },
-      ]
-    },
-    {
-      data: '19/05/2026',
-      itens: [
-        { usuario: 'Jéssica Ruiz', acao: 'Backup realizado manualmente', hora: '16:04:51', cat: 'Sistema' },
-        { usuario: 'Débora Andrade', acao: 'Tentativa de acesso negado\nMódulo: CME', hora: '15:56:01', cat: 'Acessos' },
-        { usuario: 'Lucas Emanoel', acao: 'Alterou dados do paciente\nPaciente: Antônio Marques', hora: '15:55:00', cat: 'Dados' },
-      ]
+  const ACAO_LABEL = { listar: 'Visualizar', criar: 'Criar', editar: 'Editar', remover: 'Remover' };
+
+  // Deriva, no cliente, o mesmo resultado que GET /permissoes?perfil=X
+  // devolveria — evita 3 chamadas extras já que a matriz completa cabe numa só.
+  const permissoesPorPerfil = perfis.reduce((acc, p) => {
+    acc[p.id] = permissoesMatriz
+      .map((m) => ({
+        modulo: m.modulo.replace(/\./g, ' › '),
+        acoes: Object.entries(m.perfis || {})
+          .filter(([, lista]) => lista.includes(p.perfilBruto))
+          .map(([acao]) => ACAO_LABEL[acao] || acao),
+      }))
+      .filter((m) => m.acoes.length > 0)
+      .map((m) => ({ modulo: m.modulo, nivel: m.acoes.join(', ') }));
+    return acc;
+  }, {});
+
+  // Backup: não existe endpoint HTTP para isso no backend — o único
+  // mecanismo real é um serviço do docker-compose local (pg_dump a cada
+  // 6h em ./backups), que não é acionável pela API. Tela fica como
+  // demonstração, deixado claro na interface.
+  const backupsDisponiveis = [];
+
+  // Logs e auditoria reais (GET /logs) — lidos do arquivo logs/audit.log
+  // gerado pelo Winston. Cada evento vem como { level, message, timestamp,
+  // ...meta }; não existe um campo "categoria" pronto, então os filtros
+  // usam o nível real (info | warn | error) em vez de categorias fictícias.
+  const [logsData, setLogsData] = useState([]);
+  const [auditoriaData, setAuditoriaData] = useState([]);
+
+  useEffect(() => {
+    if (telaInterna === 'logs') {
+      api.get('/logs', { params: { limite: 200 } })
+        .then((res) => setLogsData(res.data))
+        .catch((err) => console.error('Erro ao carregar logs:', err));
     }
-  ];
+    if (telaInterna === 'auditoria') {
+      api.get('/logs', { params: { limite: 200 } })
+        .then((res) => setAuditoriaData(res.data))
+        .catch((err) => console.error('Erro ao carregar auditoria:', err));
+    }
+  }, [telaInterna]);
+
+  const nomePorUsuarioId = usuariosData.reduce((acc, u) => { acc[u.id] = u.nome; return acc; }, {});
+
+  // Agrupa a lista crua de eventos por data (dd/mm/aaaa), no formato que
+  // a UI já espera: [{ data, itens: [{ usuario, acao, hora, cat }] }]
+  function agruparEventosPorData(eventos) {
+    const grupos = {};
+    eventos.forEach((ev) => {
+      const [dataParte, horaParte] = (ev.timestamp || '').split(' ');
+      const dataFormatada = dataParte
+        ? dataParte.split('-').reverse().join('/')
+        : 'Data desconhecida';
+
+      if (!grupos[dataFormatada]) grupos[dataFormatada] = [];
+      grupos[dataFormatada].push({
+        usuario: ev.usuario_id ? (nomePorUsuarioId[ev.usuario_id] || `Usuário #${ev.usuario_id}`) : 'Sistema',
+        acao: ev.message || 'Evento sem descrição',
+        hora: horaParte || '',
+        cat: ev.level || 'info',
+      });
+    });
+    return Object.entries(grupos).map(([data, itens]) => ({ data, itens }));
+  }
+
+  const dadosLogs = agruparEventosPorData(logsData);
+  const dadosAuditoria = agruparEventosPorData(auditoriaData);
+  const NIVEL_LABEL = { info: 'Informação', warn: 'Aviso', error: 'Erro' };
 
   // Filtro protegido de usuários
   const usuariosFiltrados = (usuariosData || []).filter((u) => {
@@ -410,7 +415,7 @@ export default function SettingsManager({ onClose, onLogout }) {
                 className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-11 pr-4 text-xs font-medium placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] transition shadow-xs"/>
             </div>
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-              {['Todos', 'Login', 'Cadastro', 'Alteração', 'Exclusão'].map((f) => (
+              {['Todos', 'info', 'warn', 'error'].map((f) => (
                 <button
                   key={f}
                   type="button"
@@ -419,10 +424,13 @@ export default function SettingsManager({ onClose, onLogout }) {
                     filtroLogs === f ? 'bg-[#3B44A8] text-white shadow-xs' : 'bg-gray-200/80 text-gray-600 hover:bg-gray-300'
                   }`}
                 >
-                  {f}
+                  {f === 'Todos' ? 'Todos' : NIVEL_LABEL[f]}
                 </button>
               ))}
             </div>
+            {dadosLogs.length === 0 && (
+              <p className="text-center text-gray-400 text-xs py-6">Nenhum evento registrado ainda.</p>
+            )}
             {dadosLogs.map((grupo, gIdx) => (
               <div key={gIdx} className="space-y-2 pt-1">
                 <h3 className="text-[#3B44A8] font-bold text-xs px-1">{grupo.data}</h3>
@@ -472,7 +480,7 @@ export default function SettingsManager({ onClose, onLogout }) {
               />
             </div>
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-              {['Todos', 'Dados', 'Permissões', 'Acessos', 'Sistema'].map((f) => (
+              {['Todos', 'info', 'warn', 'error'].map((f) => (
                 <button
                   key={f}
                   type="button"
@@ -481,10 +489,13 @@ export default function SettingsManager({ onClose, onLogout }) {
                     filtroAuditoria === f ? 'bg-[#3B44A8] text-white shadow-xs' : 'bg-gray-200/80 text-gray-600 hover:bg-gray-300'
                   }`}
                 >
-                  {f}
+                  {f === 'Todos' ? 'Todos' : NIVEL_LABEL[f]}
                 </button>
               ))}
             </div>
+            {dadosAuditoria.length === 0 && (
+              <p className="text-center text-gray-400 text-xs py-6">Nenhum evento registrado ainda.</p>
+            )}
             {dadosAuditoria.map((grupo, gIdx) => (
               <div key={gIdx} className="space-y-2 pt-1">
                 <h3 className="text-[#3B44A8] font-bold text-xs px-1">{grupo.data}</h3>
@@ -523,62 +534,29 @@ export default function SettingsManager({ onClose, onLogout }) {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-4 pt-6 pb-24 space-y-5 scrollbar-hide">
-            <div className="bg-white border border-gray-100 rounded-3xl divide-y divide-gray-100 shadow-sm overflow-hidden">
-              <div className="p-4 space-y-0.5">
-                <h4 className="text-xs font-bold text-gray-900">Próximo backup automático</h4>
-                <p className="text-xs font-bold text-[#3B44A8]">27/05/2026 às 07:00</p>
-              </div>
-              <div className="p-4 space-y-0.5">
-                <h4 className="text-xs font-bold text-gray-900">Último backup realizado</h4>
-                <p className="text-xs font-bold text-[#3B44A8]">20/05/2026 às 07:00</p>
-              </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-1">
+              <h4 className="text-xs font-bold text-amber-800">Backup ainda não tem API</h4>
+              <p className="text-[11px] text-amber-700 leading-relaxed">
+                O único backup real do sistema roda localmente via Docker (um dump automático do
+                Postgres a cada 6h, guardado na pasta <code>backups/</code> do servidor). Não existe
+                endpoint HTTP para disparar ou listar backups a partir do app — por isso esta tela
+                é só uma demonstração visual, sem dados reais.
+              </p>
             </div>
-            <button 
-              type="button"
-              className="w-full bg-[#F59E0B] hover:bg-amber-600 active:scale-[0.98] text-white py-3.5 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
-            >
-              <CloudDownload size={22} />
-              <span>Realizar backup agora</span>
-            </button>
             <div className="space-y-2.5">
               <h3 className="text-[#3B44A8] font-bold text-sm px-1">Backups disponíveis</h3>
-              <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm divide-y divide-gray-100">
-                {backupsDisponiveis.map((b, idx) => (
-                  <div key={idx} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-gray-500 text-[11px]">{b.dataHora}</span>
-                    <span className="font-semibold text-gray-500 text-[11px]">{b.tamanho}</span>
-                    <span className="font-semibold text-gray-500 text-[11px]">{b.tipo}</span>
-                    <button type="button" className="text-[#3B44A8] hover:text-indigo-800 transition active:scale-90 p-1 cursor-pointer">
-                      <Download size={18} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-[#3B44A8] font-bold text-sm px-1">Configurações de backup</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-[#3B44A8] px-1">Frequência</label>
-                  <div className="bg-white border border-gray-200 rounded-2xl p-3 flex items-center justify-between shadow-xs cursor-pointer">
-                    <span className="text-xs font-bold text-[#3B44A8]">Semanal</span>
-                    <ChevronDown size={18} className="text-[#3B44A8]" />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-[#3B44A8] px-1">Horário</label>
-                  <div className="bg-white border border-gray-200 rounded-2xl p-3 flex items-center justify-between shadow-xs cursor-pointer">
-                    <span className="text-xs font-bold text-[#3B44A8]">07:00</span>
-                    <ChevronDown size={18} className="text-[#3B44A8]" />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-1 pt-1">
-                <label className="text-[11px] font-bold text-[#3B44A8] px-1">Manter backups por</label>
-                <div className="bg-white border border-gray-200 rounded-2xl p-3 flex items-center justify-between shadow-xs cursor-pointer">
-                  <span className="text-xs font-bold text-[#3B44A8]">60 dias</span>
-                  <ChevronDown size={18} className="text-[#3B44A8]" />
-                </div>
+              <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm">
+                {backupsDisponiveis.length === 0 ? (
+                  <p className="text-center text-gray-400 text-xs py-2">Nenhum backup consultável por aqui.</p>
+                ) : (
+                  backupsDisponiveis.map((b, idx) => (
+                    <div key={idx} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between text-xs">
+                      <span className="font-semibold text-gray-500 text-[11px]">{b.dataHora}</span>
+                      <span className="font-semibold text-gray-500 text-[11px]">{b.tamanho}</span>
+                      <span className="font-semibold text-gray-500 text-[11px]">{b.tipo}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -611,7 +589,7 @@ export default function SettingsManager({ onClose, onLogout }) {
                   }`}>
                   <div>
                     <h4 className="text-sm font-bold text-[#3B44A8]">{item.titulo}</h4>
-                    <p className="text-[11px] text-gray-400 font-medium">{item.desc}</p>
+                    <p className="text-[11px] text-gray-400 font-medium">Perfil: {item.perfilBruto}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="bg-[#3B44A8]/10 text-[#3B44A8] text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap">
