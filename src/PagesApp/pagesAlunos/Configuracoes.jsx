@@ -25,7 +25,7 @@ export default function Configuracoes() {
           <ArrowLeft size={24} />
         </button>
         
-        <h1 className="text-xl font-bold tracking-wide mr-8">Configurações</h1>
+        <h1 className="text-lg font-bold tracking-wide flex-1 text-center px-2 leading-tight">Configurações</h1>
         
         {/* Espaçador invisível para centralizar o título */}
         <div className="w-6"></div>

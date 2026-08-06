@@ -154,7 +154,7 @@ export default function LeitorScannerProfessor() {
         >
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold tracking-wide mr-8">
+        <h1 className="text-lg font-bold tracking-wide flex-1 text-center px-2 leading-tight">
           {abaAtiva === 'qrcode' ? 'Leitura de QR-Code' : 'Leitura de Código de Barras'}
         </h1>
         <div className="w-6" aria-hidden="true" />

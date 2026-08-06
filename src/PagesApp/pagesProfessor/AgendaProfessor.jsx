@@ -65,7 +65,10 @@ export default function AgendaProfessor() {
   // existir, ficam em "Sem disciplina" em vez de sumirem da agenda.
   const agendamentosAgrupados = useMemo(() => {
     const doDia = consultas.filter((item) => {
-      const iso = new Date(item.data_hora).toISOString().split('T')[0];
+      // toISOString() converte pra UTC: uma consulta às 21h de dia 6 caía
+      // no dia 7 na comparação. Usamos os componentes locais da data.
+      const d = new Date(item.data_hora);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (iso !== stringDataSelecionada) return false;
       if (disciplinaSelecionada === 'Todas as disciplinas') return true;
       return item.disciplina === disciplinaSelecionada;

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, History, Keyboard, Barcode, X, Search } from 'lucide-react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import api from '../../Services/api';
 import { buscarMaterialPorLeitura } from '../../utils/lerCodigo';
 
@@ -14,6 +15,103 @@ export default function LeitorScanner() {
   const [codigoDigitado, setCodigoDigitado] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [erroBusca, setErroBusca] = useState('');
+
+  // Câmera de verdade. Esta tela só tinha um placeholder animado e busca
+  // por código digitado — a leitura por QR/código de barras existia apenas
+  // na versão do professor.
+  const [cameraAtiva, setCameraAtiva] = useState(false);
+  const [erroCamera, setErroCamera] = useState(null);
+  const [historicoLeituras, setHistoricoLeituras] = useState([]);
+  const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
+  const html5QrcodeRef = useRef(null);
+  const readerElementId = 'scanner-viewport-aluno';
+
+  useEffect(() => {
+    let montado = true;
+
+    const iniciarScanner = async () => {
+      setErroCamera(null);
+      if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
+        await html5QrcodeRef.current.stop().catch(() => {});
+      }
+
+      const formatos = abaAtiva === 'qrcode'
+        ? [Html5QrcodeSupportedFormats.QR_CODE]
+        : [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.UPC_A,
+          ];
+
+      try {
+        const leitor = new Html5Qrcode(readerElementId);
+        html5QrcodeRef.current = leitor;
+        await leitor.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: abaAtiva === 'qrcode' ? { width: 220, height: 220 } : { width: 280, height: 120 },
+            formatsToSupport: formatos,
+          },
+          (textoLido) => {
+            if (!montado) return;
+            processarLeitura(textoLido);
+          },
+          () => {} // frames sem leitura
+        );
+        if (montado) setCameraAtiva(true);
+      } catch (err) {
+        if (montado) {
+          console.error('Erro de câmera:', err);
+          setErroCamera('Não foi possível acessar a câmera. Use "Digitar código".');
+          setCameraAtiva(false);
+        }
+      }
+    };
+
+    iniciarScanner();
+
+    return () => {
+      montado = false;
+      if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
+        html5QrcodeRef.current.stop().catch(() => {});
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abaAtiva]);
+
+  // Caminho único de leitura: serve pra câmera e pro código digitado.
+  const processarLeitura = async (texto) => {
+    setHistoricoLeituras((anteriores) => [
+      { id: texto, tipo: abaAtiva, data: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) },
+      ...anteriores,
+    ]);
+
+    try {
+      const { material, leitura } = await buscarMaterialPorLeitura(api, texto);
+
+      if (leitura.tipo === 'pacote') {
+        setErroCamera('Esta etiqueta é de um pacote do CME, não de um material do estoque.');
+        return;
+      }
+      if (!material) {
+        setErroCamera(
+          leitura.tipo === 'codigo'
+            ? `Nenhum material cadastrado com o código ${leitura.valor}.`
+            : 'Nenhum material encontrado para esta etiqueta.'
+        );
+        return;
+      }
+
+      setModalDigitarAberto(false);
+      navigate('/app/aluno/estoque/detalhes', { state: { material } });
+    } catch (err) {
+      console.error('Erro ao buscar material:', err);
+      setErroCamera('Erro ao buscar material pelo código lido.');
+    }
+  };
 
   useEffect(() => {
     if (location.state?.modo) {
@@ -30,7 +128,7 @@ export default function LeitorScanner() {
     setBuscando(true);
     setErroBusca('');
     try {
-      // Aceita tanto o código impresso na embalagem quanto o conteúdo do
+      // Mesmo caminho da câmera: aceita o código impresso e o conteúdo do
       // QR gerado pelo sistema ("material:ID|codigo_barras:...|nome:...").
       const { material, leitura } = await buscarMaterialPorLeitura(api, codigoDigitado.trim());
 
@@ -112,13 +210,20 @@ export default function LeitorScanner() {
             abaAtiva === 'qrcode' ? 'aspect-square' : 'aspect-[16/8]'
           }`}>
             
-            {/* Visual da Câmera ao vivo */}
-            <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-medium text-xs text-center p-4 select-none">
-              <span className="animate-pulse">Aponte para o {abaAtiva === 'qrcode' ? 'QR-Code' : 'código de barras'}</span>
-            </div>
+            {/* Viewport real da câmera */}
+            <div id={readerElementId} className="w-full h-full object-cover" />
+
+            {/* Mensagem sobreposta enquanto a câmera não está ativa */}
+            {!cameraAtiva && (
+              <div className="absolute inset-0 flex items-center justify-center text-slate-300 font-medium text-xs text-center p-4 select-none pointer-events-none">
+                <span>{erroCamera || 'Iniciando câmera...'}</span>
+              </div>
+            )}
 
             {/* Linha laser de escaneamento */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-[#F9A814] shadow-[0_0_12px_#F9A814] animate-[bounce_2s_infinite]" />
+            {cameraAtiva && (
+              <div className="absolute top-0 left-0 w-full h-1 bg-[#F9A814] shadow-[0_0_12px_#F9A814] animate-[bounce_2s_infinite] pointer-events-none" />
+            )}
 
             {/* Cantoneiras de Foco Amarelas */}
             <div className="absolute top-2 left-2 w-6 h-6 border-t-4 border-l-4 border-[#F9A814] rounded-tl-lg pointer-events-none"></div>

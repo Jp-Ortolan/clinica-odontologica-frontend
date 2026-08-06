@@ -119,7 +119,7 @@ export default function NovoCicloCme() {
           className="p-1 hover:bg-white/10 rounded-lg transition active:scale-95" aria-label="Voltar">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold tracking-wide mr-8">
+        <h1 className="text-lg font-bold tracking-wide flex-1 text-center px-2 leading-tight">
           {editando ? 'Editar ciclo' : 'Novo ciclo CME'}
         </h1>
         <div className="w-6" />

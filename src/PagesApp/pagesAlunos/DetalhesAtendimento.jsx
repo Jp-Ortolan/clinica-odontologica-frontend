@@ -171,7 +171,12 @@ export default function DetalhesAtendimento() {
         
         {/* CARD DO PACIENTE */}
         <div
-          onClick={() => navigate('/app/aluno/pacientes/detalhes', { state: { paciente: pacienteCompleto || paciente } })}
+          onClick={() => navigate('/app/aluno/pacientes/detalhes', {
+            // O objeto `paciente` montado nesta tela não tem id — sem ele a
+            // tela de destino não conseguia carregar nada. Usa o id que veio
+            // na própria consulta.
+            state: { paciente: pacienteCompleto || { id: consultaRaw.paciente_id, nome: paciente.nome } },
+          })}
           className="flex items-center justify-between border border-gray-100 rounded-2xl p-4 shadow-xs bg-white cursor-pointer hover:bg-gray-50/50 transition active:scale-[0.99]"
         >
           <div className="flex items-center gap-3">

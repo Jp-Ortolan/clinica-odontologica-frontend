@@ -175,7 +175,13 @@ export default function DetalhesPacienteProfessor() {
 
   const documentosFiltrados = paciente.documentos.filter((doc) => {
     const buscaLower = buscaDoc.toLowerCase();
-    return (doc.nome_arquivo || '').toLowerCase().includes(buscaLower);
+    if (!(doc.nome_arquivo || '').toLowerCase().includes(buscaLower)) return false;
+
+    const tipo = String(doc.tipo_arquivo || '');
+    if (filtroDoc === 'imagens') return tipo.startsWith('image/');
+    if (filtroDoc === 'pdfs') return tipo === 'application/pdf';
+    if (filtroDoc === 'outros') return !tipo.startsWith('image/') && tipo !== 'application/pdf';
+    return true;
   });
 
   const getHeaderTitle = () => {
@@ -494,10 +500,13 @@ export default function DetalhesPacienteProfessor() {
                 {/* Filtros */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 shrink-0 scrollbar-none">
                   {[
+                    // Categorias derivadas do tipo real do arquivo — não
+                    // existe campo de categoria em documento_paciente, então
+                    // "Exames/Radiografias/Formulários" nunca filtrou nada.
                     { id: 'todos', label: 'Todos' },
-                    { id: 'exames', label: 'Exames' },
-                    { id: 'radiografias', label: 'Radiografias' },
-                    { id: 'formularios', label: 'Formulários' }
+                    { id: 'imagens', label: 'Imagens' },
+                    { id: 'pdfs', label: 'PDFs' },
+                    { id: 'outros', label: 'Outros' }
                   ].map((f) => (
                     <button
                       key={f.id}

@@ -86,17 +86,32 @@ export default function DetalhesPacienteRecepcao() {
 
   // Filtros aplicados ao histórico (o filtro "Cirurgias"/"Exames" não
   // se aplica a consultas — só "Consultas" e "Todos" trazem resultado)
+  // O histórico vem de /pacientes/:id/evolucoes — não há separação por
+  // consulta/cirurgia/exame no backend, então manter abas que não filtram
+  // nada só confundia. Ver a lista de abas logo abaixo.
   const historicoFiltrado = itensHistorico.filter(item => {
-    if (filtroHistorico === 'Todos' || filtroHistorico === 'Consultas') return true;
+    if (filtroHistorico === 'Todos') return true;
     return false;
   });
 
-  // Filtros aplicados aos documentos
-  const documentosFiltrados = listaDocumentos.filter(doc => {
+  // Filtros aplicados aos documentos.
+  //
+  // As abas antigas eram "Exames / Radiografias / Formulários", mas não
+  // existe categoria de documento no banco (documento_paciente guarda
+  // nome_arquivo, tipo_arquivo e o conteúdo) — o filtro devolvia a mesma
+  // lista em qualquer aba. Trocado por algo que a informação real permite:
+  // o tipo do arquivo.
+  const ehImagem = (doc) => String(doc.tipo_arquivo || '').startsWith('image/');
+  const ehPdf = (doc) => String(doc.tipo_arquivo || '') === 'application/pdf';
+
+  const documentosFiltrados = listaDocumentos.filter((doc) => {
     const nome = doc.nome_arquivo || '';
     const correspondeBusca = nome.toLowerCase().includes(buscaDocumento.toLowerCase());
-    if (filtroDocumento === 'Todos') return correspondeBusca;
-    return correspondeBusca;
+    if (!correspondeBusca) return false;
+    if (filtroDocumento === 'Imagens') return ehImagem(doc);
+    if (filtroDocumento === 'PDFs') return ehPdf(doc);
+    if (filtroDocumento === 'Outros') return !ehImagem(doc) && !ehPdf(doc);
+    return true;
   });
 
   const alternarMenu = (id) => {
@@ -266,7 +281,7 @@ export default function DetalhesPacienteRecepcao() {
         {abaAtiva === 'historico' && (
           <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden p-6 space-y-6">
             <div className="flex flex-wrap gap-2 select-none">
-              {['Todos', 'Consultas', 'Cirurgias', 'Exames'].map((cat) => (
+              {['Todos'].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFiltroHistorico(cat)}
@@ -329,7 +344,7 @@ export default function DetalhesPacienteRecepcao() {
             </div>
 
             <div className="flex flex-wrap gap-2 select-none border-b border-gray-100 pb-4">
-              {['Todos', 'Exames', 'Radiografias', 'Formulários'].map((cat) => (
+              {['Todos', 'Imagens', 'PDFs', 'Outros'].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFiltroDocumento(cat)}

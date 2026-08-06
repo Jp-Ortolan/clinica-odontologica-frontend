@@ -144,7 +144,7 @@ export default function CadastrarMaterial() {
         >
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold tracking-wide mr-8">Novo material</h1>
+        <h1 className="text-lg font-bold tracking-wide flex-1 text-center px-2 leading-tight">Novo material</h1>
         <div className="w-6"></div>
       </div>
 

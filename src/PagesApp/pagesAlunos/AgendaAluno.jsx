@@ -75,7 +75,8 @@ export default function AgendaAluno() {
         const chave = item.disciplina || 'Sem disciplina';
         if (!porDisciplina.has(chave)) porDisciplina.set(chave, []);
         porDisciplina.get(chave).push({
-          id: item.id,
+          id: item.id,                    // id da CONSULTA
+          pacienteId: item.paciente_id,   // id do PACIENTE — são coisas diferentes
           hora: new Date(item.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           nome: nomePorPacienteId[item.paciente_id] || 'Paciente sem nome',
           procedimento: item.queixa_principal || 'Consulta',
@@ -327,7 +328,12 @@ export default function AgendaAluno() {
                               <button
                                 onClick={() => {
                                   setMenuAbertoId(null);
-                                  navigate('/app/aluno/pacientes/detalhes', { state: { paciente } });
+                                  // Passava o item do agendamento inteiro, cujo "id" é o da
+                                  // consulta — a tela de paciente usava esse número para
+                                  // buscar e abria o cadastro de outra pessoa.
+                                  navigate('/app/aluno/pacientes/detalhes', {
+                                    state: { paciente: { id: paciente.pacienteId, nome: paciente.nome } },
+                                  });
                                 }}
                                 className="w-full text-left px-3 py-1.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                               >

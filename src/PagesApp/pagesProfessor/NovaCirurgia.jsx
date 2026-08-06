@@ -135,7 +135,10 @@ export default function NovaCirurgia() {
       const payload = {
         paciente_id: Number(pacienteId),
         usuario_id: Number(usuarioId),
-        data_hora: new Date(dataHora).toISOString(),
+        // O input datetime-local já entrega "AAAA-MM-DDTHH:MM" na hora local.
+        // toISOString() convertia isso pra UTC e gravava 3h adiantado, já que
+        // a coluna do banco é "timestamp without time zone" (hora da clínica).
+        data_hora: `${dataHora}:00`,
         tipo_cirurgia: tipoCirurgia || undefined,
         disciplina: disciplina || undefined,
         status,
@@ -168,7 +171,7 @@ export default function NovaCirurgia() {
           className="p-1 hover:bg-white/10 rounded-lg transition active:scale-95" aria-label="Voltar">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold tracking-wide mr-8">
+        <h1 className="text-lg font-bold tracking-wide flex-1 text-center px-2 leading-tight">
           {editando ? 'Editar cirurgia' : 'Nova cirurgia'}
         </h1>
         <div className="w-6" />
