@@ -40,25 +40,15 @@ export default function CadastroPacienteRecepcao() {
   useEffect(() => {
     if (isEditing && pacienteEdicao) {
       setNome(pacienteEdicao.nome || '');
-      setDataNascimento(pacienteEdicao.dataNascimento ? pacienteEdicao.dataNascimento.split('T')[0] : '');
-      setSexo(pacienteEdicao.sexo || '');
+      setDataNascimento(pacienteEdicao.data_nascimento ? pacienteEdicao.data_nascimento.split('T')[0] : '');
       setCpf(pacienteEdicao.cpf || '');
       setTelefone(pacienteEdicao.telefone || '');
       setEmail(pacienteEdicao.email || '');
       setEndereco(pacienteEdicao.endereco || '');
-      setNumero(pacienteEdicao.numero || '');
-      setComplemento(pacienteEdicao.complemento || '');
-      setBairro(pacienteEdicao.bairro || '');
-      setCep(pacienteEdicao.cep || '');
-      setCidade(pacienteEdicao.cidade || '');
-      setUf(pacienteEdicao.uf || 'PR');
-      setStatus(pacienteEdicao.status || 'ativo');
-
-      if (pacienteEdicao.responsavel) {
-        setNomeResponsavel(pacienteEdicao.responsavel.nomeResponsavel || pacienteEdicao.responsavel.nome || '');
-        setTelefoneResponsavel(pacienteEdicao.responsavel.telefoneResponsavel || pacienteEdicao.responsavel.telefone || '');
-        setParentesco(pacienteEdicao.responsavel.parentesco || '');
-      }
+      setStatus(pacienteEdicao.ativo === false ? 'inativo' : 'ativo');
+      // Sexo, número, complemento, bairro, CEP, cidade, UF e responsável
+      // são só de exibição neste formulário — o backend ainda não tem
+      // colunas para eles, guarda só o endereço completo em texto.
     }
   }, [isEditing, pacienteEdicao]);
 
@@ -67,29 +57,31 @@ export default function CadastroPacienteRecepcao() {
     setCarregando(true);
     setErro('');
     setSucesso('');
-    
+
+    // O backend só guarda um campo de endereço em texto — juntamos as
+    // partes do formulário (rua, número, bairro, cidade, UF, CEP) nele.
+    const enderecoCompleto = [
+      endereco && numero ? `${endereco}, ${numero}` : endereco,
+      complemento,
+      bairro,
+      cidade && uf ? `${cidade} - ${uf}` : cidade,
+      cep,
+    ].filter(Boolean).join(', ');
+
     const dadosPaciente = {
-      nome, 
-      dataNascimento, 
-      sexo, 
-      cpf, 
-      telefone, 
+      nome,
+      data_nascimento: dataNascimento,
+      cpf,
+      telefone,
       email,
-      endereco, 
-      numero, 
-      complemento, 
-      bairro, 
-      cep, 
-      cidade, 
-      uf, 
-      status,
-      responsavel: { nomeResponsavel, telefoneResponsavel, parentesco }
+      endereco: enderecoCompleto,
     };
 
     try {
       if (isEditing) {
-        const id = pacienteEdicao.id || pacienteEdicao._id;
+        const id = pacienteEdicao.id;
         await api.put(`/pacientes/${id}`, dadosPaciente);
+        await api.patch(`/pacientes/${id}/status`, { ativo: status === 'ativo' });
         setSucesso('Paciente atualizado com sucesso!');
       } else {
         await api.post('/pacientes', dadosPaciente);

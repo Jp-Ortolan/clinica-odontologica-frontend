@@ -12,24 +12,34 @@ export default function FilaPacientes() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
 
-  // Busca os atendimentos e fila do dia no banco de dados
+  // Busca as consultas de hoje e monta a fila (não existe endpoint
+  // dedicado de "fila" no backend — derivamos tudo de /consultas)
   const carregarFila = useCallback(async () => {
     try {
       setCarregando(true);
       setErro('');
 
-      // Busca os agendamentos/atendimentos de hoje
-      const resposta = await api.get('/agendamentos/hoje');
-      const dados = resposta.data || [];
+      const [consultasRes, pacientesRes] = await Promise.all([
+        api.get('/consultas'),
+        api.get('/pacientes'),
+      ]);
 
-      // Filtra de acordo com o status vindo da API
-      const aguardando = dados.filter(item => 
-        ['AGUARDANDO', 'EM_ESPERA', 'CHECK_IN'].includes(item.status?.toUpperCase())
-      );
-      
-      const emAtendimento = dados.filter(item => 
-        ['EM_ATENDIMENTO', 'EM_CONSULTA', 'INICIADO'].includes(item.status?.toUpperCase())
-      );
+      const nomePorPacienteId = {};
+      pacientesRes.data.forEach((p) => { nomePorPacienteId[p.id] = p.nome; });
+
+      const hojeStr = new Date().toDateString();
+      const dados = consultasRes.data
+        .filter((c) => new Date(c.data_hora).toDateString() === hojeStr)
+        .map((c) => ({
+          id: c.id,
+          horario: new Date(c.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          pacienteNome: nomePorPacienteId[c.paciente_id] || 'Paciente não identificado',
+          procedimento: c.queixa_principal || 'Consulta',
+          status: c.status,
+        }));
+
+      const aguardando = dados.filter((item) => item.status === 'aguardando');
+      const emAtendimento = dados.filter((item) => item.status === 'em_atendimento');
 
       setPacientesAguardando(aguardando);
       setPacientesEmAtendimento(emAtendimento);

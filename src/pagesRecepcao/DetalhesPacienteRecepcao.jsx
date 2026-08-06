@@ -42,10 +42,12 @@ export default function DetalhesPacienteRecepcao() {
       setCarregando(true);
       setErro('');
 
-      // Executa requisições em paralelo
-      const [pacienteRes, historicoRes, documentosRes] = await Promise.allSettled([
+      // A recepção não tem permissão para ver evoluções clínicas
+      // (isso é exclusivo de professor/aluno), então o "histórico"
+      // aqui mostra as consultas já registradas para esse paciente.
+      const [pacienteRes, consultasRes, documentosRes] = await Promise.allSettled([
         api.get(`/pacientes/${pacienteId}`),
-        api.get(`/pacientes/${pacienteId}/historico`).catch(() => api.get(`/agendamentos?pacienteId=${pacienteId}`)),
+        api.get('/consultas'),
         api.get(`/pacientes/${pacienteId}/documentos`)
       ]);
 
@@ -56,9 +58,12 @@ export default function DetalhesPacienteRecepcao() {
         setErro('Erro ao carregar dados do paciente.');
       }
 
-      // Define dados do histórico clínico
-      if (historicoRes.status === 'fulfilled') {
-        setItensHistorico(historicoRes.value.data || []);
+      // Define dados do histórico de consultas
+      if (consultasRes.status === 'fulfilled') {
+        const doPaciente = consultasRes.value.data.filter(
+          (c) => String(c.paciente_id) === String(pacienteId)
+        );
+        setItensHistorico(doPaciente);
       }
 
       // Define documentos do paciente
@@ -78,32 +83,43 @@ export default function DetalhesPacienteRecepcao() {
     carregarDadosPaciente();
   }, [carregarDadosPaciente]);
 
-  // Filtros aplicados ao histórico
+  // Filtros aplicados ao histórico (o filtro "Cirurgias"/"Exames" não
+  // se aplica a consultas — só "Consultas" e "Todos" trazem resultado)
   const historicoFiltrado = itensHistorico.filter(item => {
-    if (filtroHistorico === 'Todos') return true;
-    return item.categoria === filtroHistorico || item.tipo === filtroHistorico;
+    if (filtroHistorico === 'Todos' || filtroHistorico === 'Consultas') return true;
+    return false;
   });
 
   // Filtros aplicados aos documentos
   const documentosFiltrados = listaDocumentos.filter(doc => {
-    const nome = doc.nome || doc.titulo || '';
-    const sub = doc.sub || doc.descricao || '';
-    const correspondeBusca = nome.toLowerCase().includes(buscaDocumento.toLowerCase()) || 
-                             sub.toLowerCase().includes(buscaDocumento.toLowerCase());
+    const nome = doc.nome_arquivo || '';
+    const correspondeBusca = nome.toLowerCase().includes(buscaDocumento.toLowerCase());
     if (filtroDocumento === 'Todos') return correspondeBusca;
-    return correspondeBusca && doc.categoria === filtroDocumento;
+    return correspondeBusca;
   });
 
   const alternarMenu = (id) => {
     setMenuAbertoId(menuAbertoId === id ? null : id);
   };
 
-  const handleBaixarDocumento = (doc) => {
+  const handleBaixarDocumento = async (doc) => {
     setMenuAbertoId(null);
-    if (doc.url) {
-      window.open(doc.url, '_blank');
-    } else {
-      alert(`Iniciando download do arquivo: ${doc.nome}`);
+    try {
+      const resposta = await api.get(
+        `/pacientes/${pacienteId}/documentos/${doc.id}/download`,
+        { responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([resposta.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.nome_arquivo || 'documento';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Erro ao baixar documento:', err);
+      alert('Não foi possível baixar o documento.');
     }
   };
 
@@ -172,11 +188,11 @@ export default function DetalhesPacienteRecepcao() {
           </div>
 
           <span className={`text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider select-none ${
-            (paciente.status || 'ativo').toLowerCase() === 'ativo' 
-              ? 'bg-green-100 text-green-700 border border-green-200' 
+            paciente.ativo !== false
+              ? 'bg-green-100 text-green-700 border border-green-200'
               : 'bg-red-100 text-red-700 border border-red-200'
           }`}>
-            {paciente.status || 'ativo'}
+            {paciente.ativo !== false ? 'ativo' : 'inativo'}
           </span>
         </div>
 
@@ -212,7 +228,7 @@ export default function DetalhesPacienteRecepcao() {
               <div>
                 <span className="block text-gray-400 font-bold mb-0.5">Data de nascimento</span>
                 <span className="text-gray-800 font-medium flex items-center gap-1.5">
-                  <Calendar size={14} className="text-gray-400" /> {paciente.dataNascimento || paciente.nascimento || 'Não informada'}
+                  <Calendar size={14} className="text-gray-400" /> {paciente.data_nascimento ? new Date(paciente.data_nascimento).toLocaleDateString('pt-BR') : 'Não informada'}
                 </span>
               </div>
               <div>
@@ -230,10 +246,8 @@ export default function DetalhesPacienteRecepcao() {
               <div className="md:col-span-2">
                 <span className="block text-gray-400 font-bold mb-0.5">Endereço</span>
                 <span className="text-gray-800 font-medium flex items-center gap-1.5">
-                  <MapPin size={14} className="text-gray-400 shrink-0" /> 
-                  {paciente.endereco 
-                    ? `${paciente.endereco}${paciente.bairro ? ` - ${paciente.bairro}` : ''}${paciente.cidade ? `, ${paciente.cidade}` : ''}${paciente.uf ? ` - ${paciente.uf}` : ''}`
-                    : 'Endereço não cadastrado'}
+                  <MapPin size={14} className="text-gray-400 shrink-0" />
+                  {paciente.endereco || 'Endereço não cadastrado'}
                 </span>
               </div>
             </div>
@@ -264,17 +278,17 @@ export default function DetalhesPacienteRecepcao() {
                 </div>
               ) : (
                 historicoFiltrado.map((item, index) => (
-                  <div key={item.id || item._id || index} className="flex items-start justify-between p-4 hover:bg-gray-50/60 transition">
+                  <div key={item.id || index} className="flex items-start justify-between p-4 hover:bg-gray-50/60 transition">
                     <div className="flex items-start gap-12 text-xs">
                       <span className="font-bold text-gray-900 w-24 shrink-0 pt-0.5">
-                        {item.data || item.createdAt?.split('T')[0] || '--/--/----'}
+                        {item.data_hora ? new Date(item.data_hora).toLocaleDateString('pt-BR') : '--/--/----'}
                       </span>
                       <div>
                         <h4 className="font-bold text-gray-900 text-sm leading-snug">
-                          {item.tipo || item.tipoConsulta || item.procedimento || 'Procedimento'}
+                          {item.queixa_principal || 'Consulta'}
                         </h4>
-                        <p className="text-gray-400 text-xs mt-0.5">
-                          {item.profissional || item.dentista || 'Profissional não especificado'}
+                        <p className="text-gray-400 text-xs mt-0.5 capitalize">
+                          {item.status || 'Status não informado'}
                         </p>
                       </div>
                     </div>
@@ -329,27 +343,29 @@ export default function DetalhesPacienteRecepcao() {
                 </div>
               ) : (
                 documentosFiltrados.map((doc, index) => {
-                  const docId = doc.id || doc._id || index;
-                  const formato = (doc.formato || doc.extensao || 'PDF').toUpperCase();
+                  const docId = doc.id || index;
+                  const ehImagem = (doc.tipo_arquivo || '').startsWith('image/');
+                  const formato = ehImagem ? 'IMG' : (doc.tipo_arquivo?.split('/')[1] || 'PDF').toUpperCase();
+                  const tamanhoKb = doc.tamanho_bytes ? `${Math.round(doc.tamanho_bytes / 1024)} KB` : 'N/A';
 
                   return (
                     <div key={docId} className="border border-gray-200 rounded-2xl p-4 flex items-center justify-between bg-white hover:shadow-sm transition relative">
-                      
+
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="p-3 bg-gray-50 border border-gray-100 text-gray-400 rounded-xl shrink-0 flex flex-col items-center justify-center min-w-[52px]">
-                          {formato === 'PDF' ? <FileText size={20} className="text-red-500" /> : <ImageIcon size={20} className="text-blue-500" />}
+                          {!ehImagem ? <FileText size={20} className="text-red-500" /> : <ImageIcon size={20} className="text-blue-500" />}
                           <span className="text-[9px] font-black mt-0.5 text-gray-500">{formato}</span>
                         </div>
                         <div className="min-w-0">
-                          <h4 className="font-bold text-gray-900 text-xs truncate">{doc.nome || doc.titulo || 'Documento'}</h4>
+                          <h4 className="font-bold text-gray-900 text-xs truncate">{doc.nome_arquivo || 'Documento'}</h4>
                           <p className="text-gray-400 text-[11px] mt-0.5 truncate">
-                            {doc.sub || doc.descricao || 'Sem descrição'} • {doc.data || 'Data N/I'}
+                            {doc.criado_em ? new Date(doc.criado_em).toLocaleDateString('pt-BR') : 'Data N/I'}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-gray-400 text-[10px] font-bold">{doc.tamanho || 'N/A'}</span>
+                        <span className="text-gray-400 text-[10px] font-bold">{tamanhoKb}</span>
                         
                         <div className="relative">
                           <button 

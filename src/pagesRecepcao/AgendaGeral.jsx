@@ -27,18 +27,24 @@ export default function AgendaGeral() {
     setCarregando(true);
     setErro('');
     try {
-      const response = await api.get('/agendamentos', {
-        params: { mes: mesId + 1, ano }
-      });
-      
-      const dadosTratados = response.data.map((item) => {
-        const dataObj = new Date(item.dataHora || item.data);
+      // O backend não filtra por mês/ano — traz todas as consultas e
+      // filtramos por dia aqui no front (igual já era feito abaixo).
+      const [resConsultas, resPacientes] = await Promise.all([
+        api.get('/consultas'),
+        api.get('/pacientes'),
+      ]);
+
+      const nomePorPacienteId = {};
+      resPacientes.data.forEach((p) => { nomePorPacienteId[p.id] = p.nome; });
+
+      const dadosTratados = resConsultas.data.map((item) => {
+        const dataObj = new Date(item.data_hora);
         return {
-          id: item.id || item._id,
-          nome: item.pacienteNome || item.paciente?.nome || item.nome || "Paciente sem nome",
-          hora: item.hora || item.horario || dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          procedimento: item.procedimento || item.procedimentoNome || "Consulta",
-          confirmado: item.status ? item.status.toUpperCase() === 'CONFIRMADO' : (item.confirmado ?? true),
+          id: item.id,
+          nome: nomePorPacienteId[item.paciente_id] || 'Paciente sem nome',
+          hora: dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          procedimento: item.queixa_principal || 'Consulta',
+          confirmado: item.status === 'confirmada' || item.status === 'agendada',
           dia: dataObj.getDate(),
           mes: dataObj.getMonth(),
           ano: dataObj.getFullYear(),

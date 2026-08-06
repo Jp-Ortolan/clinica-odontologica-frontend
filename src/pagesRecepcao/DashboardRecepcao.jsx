@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar as CalendarIcon, Bell, CheckCircle2, AlertCircle, XCircle, RefreshCw, Loader2 } from 'lucide-react';
 import api from '../Services/api'; // Caminho ajustado para a pasta Services
+import { useAuth } from '../context/AuthContext';
 
 export default function DashboardRecepcao() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const [dataAtual, setDataAtual] = useState('');
   
   // Estados dos Dados da API
@@ -27,61 +29,45 @@ export default function DashboardRecepcao() {
     return `Hoje, ${partes.join(' de ')}`;
   };
 
-  // Função para buscar dados do backend no Railway
+  // O backend não tem uma rota de "resumo do dia" para a recepção
+  // (o /dashboard/resumo é exclusivo de professor/aluno) — então
+  // buscamos as consultas de hoje direto em /consultas e calculamos
+  // os números aqui no front.
   const carregarDadosDashboard = useCallback(async (isManual = false) => {
     if (isManual) setAtualizando(true);
-    
-    try {
-      // Data de hoje no formato YYYY-MM-DD para filtragem exata
-      const hojeIso = new Date().toISOString().split('T')[0];
 
-      // Recomposição de chamadas paralelas para otimização
-      const [resumoRes, agendamentosRes] = await Promise.allSettled([
-        api.get('/agendamentos/resumo-dia', { params: { data: hojeIso } }),
-        api.get('/agendamentos', { params: { data: hojeIso } })
+    try {
+      const hojeStr = new Date().toDateString();
+
+      const [consultasRes, pacientesRes] = await Promise.all([
+        api.get('/consultas'),
+        api.get('/pacientes'),
       ]);
 
-      // Tratamento dos Agendamentos do dia
-      if (agendamentosRes.status === 'fulfilled') {
-        const agendamentos = agendamentosRes.value.data || [];
-        
-        // Separação por status
-        const aguardando = agendamentos.filter(a => 
-          (a.status || '').toLowerCase() === 'aguardando'
-        );
-        const pendentes = agendamentos.filter(a => 
-          (a.status || '').toLowerCase() === 'pendente'
-        );
+      const nomePorPacienteId = {};
+      pacientesRes.data.forEach((p) => { nomePorPacienteId[p.id] = p.nome; });
 
-        setPacientesAguardando(aguardando);
-        setConfirmacoesPendentes(pendentes);
+      const consultasHoje = consultasRes.data
+        .filter((c) => new Date(c.data_hora).toDateString() === hojeStr)
+        .map((c) => ({
+          id: c.id,
+          hora: new Date(c.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          pacienteNome: nomePorPacienteId[c.paciente_id] || 'Paciente sem nome',
+          tipoConsulta: c.queixa_principal || 'Consulta',
+          status: c.status,
+        }));
 
-        // Caso a rota /resumo-dia não exista no backend, calcula dinamicamente
-        if (resumoRes.status !== 'fulfilled') {
-          const confirmadasCount = agendamentos.filter(a => 
-            ['confirmada', 'confirmado', 'atendido'].includes((a.status || '').toLowerCase())
-          ).length;
-          const pendentesCount = pendentes.length;
-          const faltasCount = agendamentos.filter(a => 
-            ['falta', 'cancelada', 'cancelado'].includes((a.status || '').toLowerCase())
-          ).length;
+      const aguardando = consultasHoje.filter((c) => c.status === 'aguardando' || c.status === 'em_atendimento');
+      const pendentes = consultasHoje.filter((c) => c.status === 'agendada');
 
-          setResumo({
-            confirmadas: confirmadasCount,
-            pendentes: pendentesCount,
-            faltas: faltasCount
-          });
-        }
-      }
+      setPacientesAguardando(aguardando);
+      setConfirmacoesPendentes(pendentes);
 
-      // Tratamento do Resumo retornado da API (se rota dedicada existir)
-      if (resumoRes.status === 'fulfilled' && resumoRes.value.data) {
-        setResumo({
-          confirmadas: resumoRes.value.data.confirmadas || 0,
-          pendentes: resumoRes.value.data.pendentes || 0,
-          faltas: resumoRes.value.data.faltas || 0
-        });
-      }
+      setResumo({
+        confirmadas: consultasHoje.filter((c) => c.status === 'confirmada' || c.status === 'realizada').length,
+        pendentes: pendentes.length,
+        faltas: consultasHoje.filter((c) => c.status === 'cancelada' || c.status === 'faltou').length,
+      });
 
     } catch (err) {
       console.error('Erro ao carregar painel da recepção:', err);
@@ -140,7 +126,7 @@ export default function DashboardRecepcao() {
         
         {/* Boas-Vindas */}
         <div className="select-none">
-          <h2 className="text-gray-900 text-3xl font-black tracking-tight leading-none">Olá, Rhay</h2>
+          <h2 className="text-gray-900 text-3xl font-black tracking-tight leading-none">Olá, {usuario?.nome?.split(' ')[0] || 'Recepção'}</h2>
           <p className="text-gray-500 text-sm font-medium mt-1.5">Gerenciamento e fluxo da recepção da clínica.</p>
         </div>
 

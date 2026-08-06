@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, User, Calendar, Clock, ChevronRight, Info, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import api from '../Services/api'; // Módulo de API do projeto
@@ -10,13 +10,18 @@ export default function ReagendarConsulta() {
 
   // Tenta obter os dados do agendamento passados via state ou usa objeto padrão
   const consultaAtual = location.state?.agendamento || location.state?.consulta || {};
-  const agendamentoId = id || consultaAtual.id || consultaAtual._id;
+  const agendamentoId = id || consultaAtual.id;
 
-  const paciente = consultaAtual.paciente || {
-    nome: consultaAtual.pacienteNome || 'Paciente não informado',
-    cpf: consultaAtual.pacienteCpf || '---.---.---',
-    status: 'Ativo'
-  };
+  // O objeto de consulta só tem paciente_id — buscamos o paciente à parte
+  const [paciente, setPaciente] = useState({ nome: 'Paciente não informado', cpf: '---.---.---', status: 'Ativo' });
+
+  useEffect(() => {
+    if (consultaAtual.paciente_id) {
+      api.get(`/pacientes/${consultaAtual.paciente_id}`)
+        .then((res) => setPaciente(res.data))
+        .catch((err) => console.error('Erro ao buscar paciente:', err));
+    }
+  }, [consultaAtual.paciente_id]);
 
   // Formulário de Reagendamento
   const [novaData, setNovaData] = useState('');
@@ -47,23 +52,15 @@ export default function ReagendarConsulta() {
       setSalvando(true);
       setErro('');
 
-      const payload = {
-        data: novaData,
-        horario: novoHorario,
-        motivoAlteracao: motivo,
-        observacoes,
-        status: 'AGENDADO'
-      };
+      const observacoesAtualizadas = [consultaAtual.observacoes, `Reagendada: ${motivo}`, observacoes]
+        .filter(Boolean)
+        .join(' | ');
 
-      // Chamada PUT para reagendar
-      await api.put(`/agendamentos/${agendamentoId}/reagendar`, payload)
-        .catch(async () => {
-          // Fallback para rota padrão caso a rota específica não exista
-          await api.put(`/agendamentos/${agendamentoId}`, {
-            ...consultaAtual,
-            ...payload
-          });
-        });
+      await api.put(`/consultas/${agendamentoId}`, {
+        data_hora: `${novaData}T${novoHorario}:00`,
+        status: 'agendada',
+        observacoes: observacoesAtualizadas,
+      });
 
       setSucesso(true);
       setTimeout(() => {
@@ -142,23 +139,11 @@ export default function ReagendarConsulta() {
               {consultaAtual.status || 'Agendada'}
             </span>
             <div className="flex gap-4 text-[#3B44A8] font-black text-sm mb-2">
-              <span>{consultaAtual.data || consultaAtual.dataAgendamento || 'Data não informada'}</span>
-              <span>{consultaAtual.horario || consultaAtual.hora || 'Horário não informado'}</span>
+              <span>{consultaAtual.data_hora ? new Date(consultaAtual.data_hora).toLocaleDateString('pt-BR') : 'Data não informada'}</span>
+              <span>{consultaAtual.data_hora ? new Date(consultaAtual.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Horário não informado'}</span>
             </div>
             <div className="text-[11px] text-gray-700 font-bold space-y-0.5">
-              <p>{consultaAtual.procedimento || consultaAtual.procedimentoNome || 'Avaliação'}</p>
-              <p className="text-gray-500 font-medium">
-                Profissional responsável: {consultaAtual.profissional || consultaAtual.dentista || 'Não informado'}
-              </p>
-              {consultaAtual.aluno && (
-                <p className="text-gray-500 font-medium">Aluno: {consultaAtual.aluno}</p>
-              )}
-              {consultaAtual.especialidade && (
-                <p className="text-gray-500 font-medium">Especialidade: {consultaAtual.especialidade}</p>
-              )}
-              {consultaAtual.consultorio && (
-                <p className="text-gray-500 font-medium">Local: {consultaAtual.consultorio}</p>
-              )}
+              <p>{consultaAtual.queixa_principal || 'Avaliação'}</p>
             </div>
           </div>
         </div>

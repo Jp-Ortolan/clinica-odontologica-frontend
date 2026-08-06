@@ -14,11 +14,22 @@ export default function AgendarConsulta() {
   // Estados do formulário
   const [disciplina, setDisciplina] = useState('');
   const [tipoConsulta, setTipoConsulta] = useState('Avaliação');
-  const [profissional, setProfissional] = useState('');
-  const [aluno, setAluno] = useState('');
+  const [usuarioId, setUsuarioId] = useState('');
+  const [profissionais, setProfissionais] = useState([]);
   const [data, setData] = useState('');
   const [hora, setHora] = useState('');
   const [observacoes, setObservacoes] = useState('');
+
+  // Carrega professores e alunos disponíveis para vincular à consulta
+  // (o backend exige um usuario_id real, não um nome digitado)
+  useEffect(() => {
+    api.get('/usuarios', { params: { ativo: 'true' } })
+      .then((res) => {
+        const responsaveis = res.data.filter((u) => u.perfil === 'professor' || u.perfil === 'aluno');
+        setProfissionais(responsaveis);
+      })
+      .catch((err) => console.error('Erro ao carregar profissionais:', err));
+  }, []);
 
   // Estados de busca de pacientes
   const [termoBusca, setTermoBusca] = useState('');
@@ -32,41 +43,36 @@ export default function AgendarConsulta() {
   const [mensagemSucesso, setMensagemSucesso] = useState('');
   const [erro, setErro] = useState('');
 
-  // Busca dinamicamente os pacientes na API à medida que o usuário digita
+  // O backend não tem busca por nome/cpf via query — trazemos todos os
+  // pacientes uma vez e filtramos aqui no front a cada tecla digitada.
+  const [todosPacientes, setTodosPacientes] = useState([]);
+
   useEffect(() => {
-    const buscarPacientesAPI = async () => {
-      if (termoBusca.trim().length === 0) {
-        setPacientesFiltrados([]);
-        return;
-      }
-
-      setBuscandoPacientes(true);
-      try {
-        const response = await api.get('/pacientes', {
-          params: { busca: termoBusca }
-        });
-
-        const lista = response.data.map(p => ({
-          id: p.id || p._id,
+    api.get('/pacientes')
+      .then((res) => {
+        setTodosPacientes(res.data.map((p) => ({
+          id: p.id,
           nome: p.nome,
           cpf: p.cpf || 'Sem CPF',
-          status: p.status || 'Ativo'
-        }));
+          status: 'Ativo'
+        })));
+      })
+      .catch((err) => console.error('Erro ao buscar pacientes:', err));
+  }, []);
 
-        setPacientesFiltrados(lista);
-      } catch (err) {
-        console.error('Erro ao buscar pacientes:', err);
-      } finally {
-        setBuscandoPacientes(false);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      if (termoBusca) buscarPacientesAPI();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [termoBusca]);
+  useEffect(() => {
+    if (termoBusca.trim().length === 0) {
+      setPacientesFiltrados([]);
+      return;
+    }
+    setBuscandoPacientes(true);
+    const termo = termoBusca.trim().toLowerCase();
+    const resultado = todosPacientes.filter((p) =>
+      p.nome.toLowerCase().includes(termo) || (p.cpf || '').includes(termo)
+    );
+    setPacientesFiltrados(resultado);
+    setBuscandoPacientes(false);
+  }, [termoBusca, todosPacientes]);
 
   // Fecha o dropdown ao clicar fora do campo
   useEffect(() => {
@@ -87,6 +93,14 @@ export default function AgendarConsulta() {
       setErro('Por favor, selecione um paciente.');
       return;
     }
+    if (!usuarioId) {
+      setErro('Selecione o profissional/aluno responsável.');
+      return;
+    }
+    if (!data || !hora) {
+      setErro('Informe a data e o horário da consulta.');
+      return;
+    }
 
     setEnviando(true);
     setErro('');
@@ -94,20 +108,15 @@ export default function AgendarConsulta() {
 
     try {
       const payload = {
-        pacienteId: pacienteSelecionado.id,
-        pacienteNome: pacienteSelecionado.nome,
-        disciplina,
-        tipoConsulta,
-        procedimento: tipoConsulta,
-        profissional,
-        aluno,
-        data,
-        hora,
+        paciente_id: pacienteSelecionado.id,
+        usuario_id: Number(usuarioId),
+        data_hora: `${data}T${hora}:00`,
+        queixa_principal: disciplina ? `${disciplina} — ${tipoConsulta}` : tipoConsulta,
         observacoes,
-        status: 'AGENDADO'
+        status: 'agendada'
       };
 
-      await api.post('/agendamentos', payload);
+      await api.post('/consultas', payload);
 
       setMensagemSucesso('Consulta agendada com sucesso!');
       
@@ -319,33 +328,22 @@ export default function AgendarConsulta() {
           </div>
         </div>
 
-        {/* Profissional / Aluno */}
+        {/* Profissional / Aluno responsável */}
         <div className="space-y-1.5">
-          <label className="text-sm font-black text-[#3B44A8]">Profissional / Aluno</label>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <span className="text-[11px] font-bold text-gray-500 block mb-1">Profissional responsável *</span>
-              <input 
-                type="text" 
-                placeholder="Nome do profissional" 
-                value={profissional}
-                onChange={(e) => setProfissional(e.target.value)}
-                required
-                className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:border-[#3B44A8]" 
-              />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-gray-500 block mb-1">Aluno responsável *</span>
-              <input 
-                type="text" 
-                placeholder="Nome do aluno" 
-                value={aluno}
-                onChange={(e) => setAluno(e.target.value)}
-                required
-                className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:border-[#3B44A8]" 
-              />
-            </div>
-          </div>
+          <label className="text-sm font-black text-[#3B44A8]">Profissional / Aluno responsável *</label>
+          <select
+            value={usuarioId}
+            onChange={(e) => setUsuarioId(e.target.value)}
+            required
+            className="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm font-medium text-gray-700 focus:outline-none focus:border-[#3B44A8]"
+          >
+            <option value="">Selecione quem vai atender</option>
+            {profissionais.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome} ({p.perfil === 'professor' ? 'Professor' : 'Aluno'})
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Data e Horário */}

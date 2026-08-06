@@ -21,19 +21,23 @@ export default function StatusConsultas() {
       setCarregando(true);
       setErro('');
 
-      // Mapeamento das abas para o status do backend
+      // Mapeamento das abas para o status real do backend (enum de "consulta")
       const mapaStatus = {
-        confirmadas: 'CONFIRMADO',
-        pendentes: 'PENDENTE',
-        faltas: 'FALTA' // ou 'NAO_COMPARECEU' / 'CANCELADO' conforme convenção da API
+        confirmadas: 'confirmada',
+        pendentes: 'agendada',
+        faltas: 'faltou'
       };
 
-      const statusParam = mapaStatus[abaAtiva] || 'CONFIRMADO';
-      const resposta = await api.get('/agendamentos', {
-        params: { status: statusParam }
-      });
+      const statusParam = mapaStatus[abaAtiva] || 'confirmada';
+      const [consultasRes, pacientesRes] = await Promise.all([
+        api.get('/consultas', { params: { status: statusParam } }),
+        api.get('/pacientes'),
+      ]);
 
-      setConsultas(resposta.data || []);
+      const nomePorPacienteId = {};
+      pacientesRes.data.forEach((p) => { nomePorPacienteId[p.id] = p.nome; });
+
+      setConsultas(consultasRes.data.map((c) => ({ ...c, _pacienteNome: nomePorPacienteId[c.paciente_id] })) || []);
     } catch (err) {
       console.error('Erro ao buscar consultas por status:', err);
       setErro('Não foi possível carregar as consultas.');
@@ -166,17 +170,17 @@ export default function StatusConsultas() {
               </div>
             ) : (
               consultas.map((item, idx) => (
-                <ItemLista 
-                  key={item.id || item._id || idx} 
+                <ItemLista
+                  key={item.id || idx}
                   paciente={{
-                    id: item.id || item._id,
-                    data: item.data || '---',
-                    hora: item.horario || item.hora || '--:--',
-                    nome: item.pacienteNome || item.paciente?.nome || 'Paciente sem nome',
-                    proc: item.procedimento || item.servico || 'Consulta Geral',
-                    esp: item.especialidade || item.categoria || 'Odontologia',
+                    id: item.id,
+                    data: item.data_hora ? new Date(item.data_hora).toLocaleDateString('pt-BR') : '---',
+                    hora: item.data_hora ? new Date(item.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+                    nome: item._pacienteNome || 'Paciente sem nome',
+                    proc: item.queixa_principal || 'Consulta Geral',
+                    esp: 'Odontologia',
                     raw: item
-                  }} 
+                  }}
                   onSelect={(agendamento) => navigate('/app/recepcao/agenda', { state: { agendamento } })}
                 />
               ))
