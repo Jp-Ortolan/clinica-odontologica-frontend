@@ -22,6 +22,18 @@ export default function CadastrarMaterialProfessor() {
   const [categoria, setCategoria] = useState('');
   const [categorias, setCategorias] = useState([]);
   const [unidade, setUnidade] = useState('');
+  // Quantidade que entra no estoque junto com o cadastro. Antes não
+  // existia campo pra isso e o backend assumia 0 — todo material nascia
+  // zerado, sem jeito de informar o que estava chegando.
+  const [quantidade, setQuantidade] = useState('');
+  const [lote, setLote] = useState('');
+  // Criação rápida de categoria: sem isto, se a lista estivesse vazia não
+  // havia como cadastrar material nenhum (categoria_id é obrigatório) e o
+  // endpoint POST /categorias não tinha tela em lugar nenhum do app.
+  const [criandoCategoria, setCriandoCategoria] = useState(false);
+  const [novaCategoria, setNovaCategoria] = useState('');
+  const [salvandoCategoria, setSalvandoCategoria] = useState(false);
+  const [registroAnvisa, setRegistroAnvisa] = useState('');
   const [estoqueMinimo, setEstoqueMinimo] = useState('');
   const [estoqueIdeal, setEstoqueIdeal] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -97,8 +109,17 @@ export default function CadastrarMaterialProfessor() {
         codigo_barras: codigoBarras,
         categoria_id: Number(categoria),
         unidade_medida: unidade,
+        quantidade: quantidade === '' ? 0 : Number(quantidade),
         estoque_minimo: Number(estoqueMinimo),
         estoque_ideal: estoqueIdeal ? Number(estoqueIdeal) : null,
+        // A descrição já era digitada na tela, mas nunca ia junto no envio.
+        descricao: descricao || undefined,
+        lote: lote || undefined,
+        registro_anvisa: registroAnvisa || undefined,
+        // Se já entra material no cadastro, a data de entrada é hoje.
+        data_entrada: quantidade && Number(quantidade) > 0
+          ? new Date().toISOString().slice(0, 10)
+          : undefined,
         fabricante: fabricante || undefined,
         validade: validade || undefined,
         imagem_base64: imagemBase64 || undefined,
@@ -182,9 +203,51 @@ export default function CadastrarMaterialProfessor() {
 
           {/* Categoria */}
           <div className="space-y-1">
-            <label className="text-gray-700 text-xs font-bold block">
-              Categoria <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-gray-700 text-xs font-bold block">
+                Categoria <span className="text-red-500">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setCriandoCategoria((v) => !v)}
+                className="text-[#3B44A8] text-[10px] font-bold hover:underline"
+              >
+                {criandoCategoria ? 'Cancelar' : '+ Nova categoria'}
+              </button>
+            </div>
+
+            {criandoCategoria && (
+              <div className="flex gap-2 pb-1">
+                <input
+                  type="text"
+                  placeholder="Nome da nova categoria"
+                  value={novaCategoria}
+                  onChange={(e) => setNovaCategoria(e.target.value)}
+                  className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8]"
+                />
+                <button
+                  type="button"
+                  disabled={salvandoCategoria || !novaCategoria.trim()}
+                  onClick={async () => {
+                    setSalvandoCategoria(true);
+                    try {
+                      const { data } = await api.post('/categorias', { nome: novaCategoria.trim() });
+                      setCategorias((atuais) => [...atuais, data]);
+                      setCategoria(String(data.id));
+                      setNovaCategoria('');
+                      setCriandoCategoria(false);
+                    } catch (err) {
+                      setErro(err.response?.data?.message || 'Não foi possível criar a categoria.');
+                    } finally {
+                      setSalvandoCategoria(false);
+                    }
+                  }}
+                  className="px-4 bg-[#3B44A8] text-white rounded-xl text-xs font-bold disabled:opacity-40"
+                >
+                  {salvandoCategoria ? '...' : 'Criar'}
+                </button>
+              </div>
+            )}
             <div className="relative">
               <select
                 value={categoria}
@@ -225,6 +288,25 @@ export default function CadastrarMaterialProfessor() {
               </select>
               <ChevronDown className="absolute right-4 top-3.5 text-gray-400 pointer-events-none" size={16} />
             </div>
+          </div>
+
+          {/* Quantidade inicial em estoque */}
+          <div className="space-y-1">
+            <label className="text-gray-700 text-xs font-bold block">
+              Quantidade inicial em estoque
+            </label>
+            <input
+              type="number"
+              min="0"
+              placeholder="Ex.: 50 (deixe 0 se ainda não recebeu)"
+              value={quantidade}
+              onChange={(e) => setQuantidade(e.target.value)}
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
+            />
+            <p className="text-gray-400 text-[10px] font-medium pt-0.5">
+              Quantas unidades já estão disponíveis hoje. Depois use as
+              movimentações de entrada e saída para alterar esse número.
+            </p>
           </div>
 
           {/* Estoque Mínimo e Ideal */}
@@ -285,6 +367,30 @@ export default function CadastrarMaterialProfessor() {
               onChange={(e) => setFabricante(e.target.value)}
               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
             />
+          </div>
+
+          {/* Lote e registro ANVISA */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-gray-700 text-xs font-bold block">Lote</label>
+              <input
+                type="text"
+                placeholder="Nº do lote"
+                value={lote}
+                onChange={(e) => setLote(e.target.value)}
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-gray-700 text-xs font-bold block">Registro ANVISA</label>
+              <input
+                type="text"
+                placeholder="Nº do registro"
+                value={registroAnvisa}
+                onChange={(e) => setRegistroAnvisa(e.target.value)}
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
+              />
+            </div>
           </div>
 
           {/* Data de validade */}

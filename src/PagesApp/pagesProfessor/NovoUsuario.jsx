@@ -80,6 +80,10 @@ export default function NovoUsuario() {
       telefone: formData.telefone.replace(/\D/g, ''),
       perfil: formData.perfil,
       senha: formData.senhaTemporaria,
+      // O campo "Status" era obrigatório na tela mas nunca era enviado:
+      // o usuário sempre nascia com o padrão do banco, mesmo marcando
+      // "Inativo". A coluna é booleana (usuario.ativo).
+      ativo: formData.status !== 'inativo',
     };
 
     setSalvando(true);

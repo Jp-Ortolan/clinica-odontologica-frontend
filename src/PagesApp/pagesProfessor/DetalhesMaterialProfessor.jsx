@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, AlertTriangle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import api from '../../Services/api';
+import AcoesMaterial from '../../components/AcoesMaterial';
 
 export default function DetalhesMaterialProfessor() {
   const navigate = useNavigate();
@@ -18,19 +19,19 @@ export default function DetalhesMaterialProfessor() {
   // Sempre busca o material completo por id — a lista que manda o state
   // via navegação usa uma versão "enxuta" (sem a imagem_base64 inteira,
   // só um booleano tem_imagem), então só essa chamada garante a foto real.
-  useEffect(() => {
-    if (materialId) {
-      api.get(`/materiais/${materialId}`).then((res) => setMaterial(res.data)).catch((err) => console.error(err));
-    }
+  // Recarrega material e histórico. Fica numa função só porque as ações
+  // (entrada, saída, edição) precisam atualizar a tela depois de salvar.
+  const recarregar = useCallback(() => {
+    if (!materialId) return;
+    api.get(`/materiais/${materialId}`)
+      .then((res) => setMaterial(res.data))
+      .catch((err) => console.error(err));
+    api.get('/movimentacoes', { params: { material_id: materialId } })
+      .then((res) => setMovimentacoes(res.data))
+      .catch((err) => console.error('Erro ao carregar movimentações:', err));
   }, [materialId]);
 
-  useEffect(() => {
-    if (materialId) {
-      api.get('/movimentacoes', { params: { material_id: materialId } })
-        .then((res) => setMovimentacoes(res.data))
-        .catch((err) => console.error('Erro ao carregar movimentações:', err));
-    }
-  }, [materialId]);
+  useEffect(() => { recarregar(); }, [recarregar]);
 
   if (!material) {
     return <div className="p-8 text-center text-gray-400 text-sm">Carregando material...</div>;
@@ -150,6 +151,19 @@ export default function DetalhesMaterialProfessor() {
             </div>
           </div>
         </div>
+
+        {/* DESCRIÇÃO (a coluna passou a existir na migration 011) */}
+        {material.descricao && (
+          <div className="space-y-2">
+            <h3 className="text-[#3B44A8] font-bold text-xs tracking-wide select-none px-1">Descrição</h3>
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs text-[11px] font-medium text-gray-600 leading-relaxed whitespace-pre-line">
+              {material.descricao}
+            </div>
+          </div>
+        )}
+
+        {/* AÇÕES: entrada, saída, editar e (professor) excluir */}
+        <AcoesMaterial material={material} aoAtualizar={recarregar} />
 
         {/* SEÇÃO ÚLTIMAS MOVIMENTAÇÕES */}
         <div className="space-y-2">

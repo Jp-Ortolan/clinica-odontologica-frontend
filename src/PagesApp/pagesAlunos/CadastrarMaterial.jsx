@@ -22,6 +22,13 @@ export default function CadastrarMaterial() {
   const [categoria, setCategoria] = useState('');
   const [categorias, setCategorias] = useState([]);
   const [unidade, setUnidade] = useState('');
+  // Quantidade que entra no estoque junto com o cadastro. Antes não
+  // existia campo pra isso e o backend assumia 0 — todo material nascia
+  // zerado, sem jeito de informar o que estava chegando.
+  const [quantidade, setQuantidade] = useState('');
+  const [lote, setLote] = useState('');
+
+  const [registroAnvisa, setRegistroAnvisa] = useState('');
   const [estoqueMinimo, setEstoqueMinimo] = useState('');
   const [estoqueIdeal, setEstoqueIdeal] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -97,8 +104,17 @@ export default function CadastrarMaterial() {
         codigo_barras: codigoBarras,
         categoria_id: Number(categoria),
         unidade_medida: unidade,
+        quantidade: quantidade === '' ? 0 : Number(quantidade),
         estoque_minimo: Number(estoqueMinimo),
         estoque_ideal: estoqueIdeal ? Number(estoqueIdeal) : null,
+        // A descrição já era digitada na tela, mas nunca ia junto no envio.
+        descricao: descricao || undefined,
+        lote: lote || undefined,
+        registro_anvisa: registroAnvisa || undefined,
+        // Se já entra material no cadastro, a data de entrada é hoje.
+        data_entrada: quantidade && Number(quantidade) > 0
+          ? new Date().toISOString().slice(0, 10)
+          : undefined,
         fabricante: fabricante || undefined,
         validade: validade || undefined,
         imagem_base64: imagemBase64 || undefined,
@@ -182,9 +198,13 @@ export default function CadastrarMaterial() {
 
           {/* Categoria */}
           <div className="space-y-1">
-            <label className="text-gray-700 text-xs font-bold block">
-              Categoria <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-gray-700 text-xs font-bold block">
+                Categoria <span className="text-red-500">*</span>
+              </label>
+
+            </div>
+
             <div className="relative">
               <select
                 value={categoria}
@@ -199,6 +219,12 @@ export default function CadastrarMaterial() {
               </select>
               <ChevronDown className="absolute right-4 top-3.5 text-gray-400 pointer-events-none" size={16} />
             </div>
+            {categorias.length === 0 && (
+              <p className="text-amber-600 text-[10px] font-semibold pt-1">
+                Nenhuma categoria cadastrada ainda. Peça a um professor para criar
+                uma antes de cadastrar o material.
+              </p>
+            )}
           </div>
         </div>
 
@@ -225,6 +251,25 @@ export default function CadastrarMaterial() {
               </select>
               <ChevronDown className="absolute right-4 top-3.5 text-gray-400 pointer-events-none" size={16} />
             </div>
+          </div>
+
+          {/* Quantidade inicial em estoque */}
+          <div className="space-y-1">
+            <label className="text-gray-700 text-xs font-bold block">
+              Quantidade inicial em estoque
+            </label>
+            <input
+              type="number"
+              min="0"
+              placeholder="Ex.: 50 (deixe 0 se ainda não recebeu)"
+              value={quantidade}
+              onChange={(e) => setQuantidade(e.target.value)}
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
+            />
+            <p className="text-gray-400 text-[10px] font-medium pt-0.5">
+              Quantas unidades já estão disponíveis hoje. Depois use as
+              movimentações de entrada e saída para alterar esse número.
+            </p>
           </div>
 
           {/* Estoque Mínimo e Ideal */}
@@ -285,6 +330,30 @@ export default function CadastrarMaterial() {
               onChange={(e) => setFabricante(e.target.value)}
               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
             />
+          </div>
+
+          {/* Lote e registro ANVISA */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-gray-700 text-xs font-bold block">Lote</label>
+              <input
+                type="text"
+                placeholder="Nº do lote"
+                value={lote}
+                onChange={(e) => setLote(e.target.value)}
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-gray-700 text-xs font-bold block">Registro ANVISA</label>
+              <input
+                type="text"
+                placeholder="Nº do registro"
+                value={registroAnvisa}
+                onChange={(e) => setRegistroAnvisa(e.target.value)}
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-[#3B44A8] shadow-sm transition"
+              />
+            </div>
           </div>
 
           {/* Data de validade */}

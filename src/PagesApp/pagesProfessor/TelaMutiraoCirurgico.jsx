@@ -33,6 +33,13 @@ export default function TelaMutiraoCirurgico() {
   const [mutirao, setMutirao] = useState(null);
   const [cirurgiasDoMutirao, setCirurgiasDoMutirao] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  // Criação de mutirão. POST /cirurgias/mutiroes existia no backend, mas
+  // a tela só sabia mostrar o mutirão que já estivesse cadastrado — e se
+  // não houvesse nenhum, ficava num beco sem saída.
+  const [criando, setCriando] = useState(false);
+  const [formMutirao, setFormMutirao] = useState({ nome: '', data_evento: '', local: '', observacoes: '' });
+  const [salvandoMutirao, setSalvandoMutirao] = useState(false);
+  const [erroMutirao, setErroMutirao] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -81,6 +88,32 @@ export default function TelaMutiraoCirurgico() {
   const totalAgendadas = cirurgiasDoMutirao.filter((c) => c.status === 'agendada').length;
   const totalCanceladas = cirurgiasDoMutirao.filter((c) => c.status === 'cancelada').length;
 
+  const salvarMutirao = async () => {
+    if (!formMutirao.nome.trim() || !formMutirao.data_evento) {
+      setErroMutirao('Nome e data do evento são obrigatórios.');
+      return;
+    }
+    setSalvandoMutirao(true);
+    setErroMutirao('');
+    try {
+      await api.post('/cirurgias/mutiroes', {
+        nome: formMutirao.nome.trim(),
+        data_evento: formMutirao.data_evento,
+        local: formMutirao.local.trim() || undefined,
+        observacoes: formMutirao.observacoes.trim() || undefined,
+      });
+      setCriando(false);
+      setFormMutirao({ nome: '', data_evento: '', local: '', observacoes: '' });
+      window.location.reload();
+    } catch (err) {
+      setErroMutirao(err.response?.data?.message || 'Não foi possível criar o mutirão.');
+    } finally {
+      setSalvandoMutirao(false);
+    }
+  };
+
+  const inputMutirao = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3B42B2]';
+
   return (
     <div className="w-full h-full min-h-screen bg-[#3B42B2] text-white flex flex-col justify-between font-sans m-0 p-0 overflow-x-hidden">
 
@@ -104,8 +137,17 @@ export default function TelaMutiraoCirurgico() {
         {carregando ? (
           <div className="text-center text-slate-400 text-xs font-semibold py-10">Carregando mutirão...</div>
         ) : !mutirao ? (
-          <div className="text-center text-slate-400 text-xs font-semibold py-10 border border-dashed border-slate-200 rounded-2xl">
-            Nenhum mutirão cirúrgico cadastrado ainda.
+          <div className="space-y-3">
+            <div className="text-center text-slate-400 text-xs font-semibold py-8 border border-dashed border-slate-200 rounded-2xl">
+              Nenhum mutirão cirúrgico cadastrado ainda.
+            </div>
+            <button
+              type="button"
+              onClick={() => setCriando(true)}
+              className="w-full py-3.5 bg-[#F9A814] hover:bg-[#e0940f] text-white rounded-2xl font-bold text-sm shadow-md transition active:scale-[0.98]"
+            >
+              Criar primeiro mutirão
+            </button>
           </div>
         ) : (
           <>
@@ -254,6 +296,59 @@ export default function TelaMutiraoCirurgico() {
           <span className="text-[10px] font-medium">Estoque</span>
         </button>
       </nav>
+
+      {/* MODAL: NOVO MUTIRÃO (POST /cirurgias/mutiroes) */}
+      {criando && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => !salvandoMutirao && setCriando(false)}>
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl space-y-3 text-slate-800"
+            onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-[#3B42B2] text-sm border-b pb-3">Novo mutirão cirúrgico</h3>
+
+            {erroMutirao && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-[11px] rounded-xl font-semibold">
+                {erroMutirao}
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-600">Nome do mutirão *</label>
+              <input type="text" value={formMutirao.nome} autoFocus
+                onChange={(e) => setFormMutirao((f) => ({ ...f, nome: e.target.value }))}
+                placeholder="Ex.: Mutirão de Exodontias" className={inputMutirao} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-600">Data do evento *</label>
+              <input type="date" value={formMutirao.data_evento}
+                onChange={(e) => setFormMutirao((f) => ({ ...f, data_evento: e.target.value }))}
+                className={inputMutirao} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-600">Local</label>
+              <input type="text" value={formMutirao.local}
+                onChange={(e) => setFormMutirao((f) => ({ ...f, local: e.target.value }))}
+                placeholder="Ex.: Clínica II" className={inputMutirao} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-600">Observações</label>
+              <textarea rows={2} value={formMutirao.observacoes}
+                onChange={(e) => setFormMutirao((f) => ({ ...f, observacoes: e.target.value }))}
+                className={`${inputMutirao} resize-none`} />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={() => setCriando(false)} disabled={salvandoMutirao}
+                className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-bold text-xs">
+                Cancelar
+              </button>
+              <button type="button" onClick={salvarMutirao} disabled={salvandoMutirao}
+                className="flex-1 py-2.5 bg-[#3B42B2] text-white rounded-xl font-bold text-xs disabled:opacity-50">
+                {salvandoMutirao ? 'Criando...' : 'Criar mutirão'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -10,8 +10,7 @@ import {
   Box,
   CheckCircle,
   Scissors,
-  User
-} from 'lucide-react';
+  User, Plus } from 'lucide-react';
 import api from '../../Services/api';
 
 export default function GerenciadorCirurgias() {
@@ -139,6 +138,16 @@ export default function GerenciadorCirurgias() {
             aria-label="Selecionar data"
           />
         </div>
+
+        {/* Agendar nova cirurgia (POST /cirurgias não tinha tela nenhuma) */}
+        <button
+          type="button"
+          onClick={() => navigate('/app/professor/cirurgias/nova')}
+          className="w-full flex items-center justify-center gap-2 bg-[#F9A814] hover:bg-[#e0940f] text-white rounded-2xl px-4 py-3.5 font-bold text-sm shadow-md transition active:scale-[0.98]"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" />
+          Agendar nova cirurgia
+        </button>
 
         {/* Seletor 2: Mutirão Cirúrgico */}
         <button

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Bell, Calendar, ChevronRight, User, Loader2 } from 'lucide-react';
+import { Settings, Bell, Calendar, ChevronRight, User, Loader2, Download } from 'lucide-react';
 import api from '../../Services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useContagemNaoLidas } from '../../hooks/useNotificacoes';
@@ -11,6 +11,7 @@ export default function DashboardProfessor() {
   const { total: totalNaoLidas } = useContagemNaoLidas();
   const [loading, setLoading] = useState(true);
   const [dataAtual, setDataAtual] = useState('');
+  const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
 
   const [metricas, setMetricas] = useState({
     consultasHoje: 0,
@@ -86,6 +87,28 @@ export default function DashboardProfessor() {
     carregarDadosDashboard();
   }, []);
 
+  // GET /dashboard/relatorio-pdf devolve o PDF em binário; sem
+  // responseType 'blob' o axios trata como texto e o arquivo sai corrompido.
+  const baixarRelatorio = async () => {
+    setBaixandoRelatorio(true);
+    try {
+      const resposta = await api.get('/dashboard/relatorio-pdf', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([resposta.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'relatorio-dashboard.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Erro ao baixar relatório:', err);
+      alert('Não foi possível gerar o relatório.');
+    } finally {
+      setBaixandoRelatorio(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#3B44A8] overflow-hidden font-sans">
       
@@ -140,6 +163,17 @@ export default function DashboardProfessor() {
           <span className="text-[#3B44A8] font-bold text-xs">{dataAtual}</span>
           <Calendar className="text-[#3B44A8]" size={18} />
         </div>
+
+        {/* Relatório em PDF — GET /dashboard/relatorio-pdf não tinha botão */}
+        <button
+          type="button"
+          onClick={baixarRelatorio}
+          disabled={baixandoRelatorio}
+          className="w-full flex items-center justify-center gap-2 py-2.5 border border-[#3B44A8]/25 text-[#3B44A8] hover:bg-[#3B44A8]/5 rounded-xl font-bold text-[11px] transition active:scale-[0.98] disabled:opacity-50"
+        >
+          <Download size={14} />
+          {baixandoRelatorio ? 'Gerando relatório...' : 'Baixar relatório em PDF'}
+        </button>
 
         {/* 4 CARDS INDICADORES DINÂMICOS */}
         <div className="grid grid-cols-4 gap-1.5 select-none">

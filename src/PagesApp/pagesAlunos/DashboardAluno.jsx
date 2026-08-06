@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Bell, Calendar, ChevronRight, User } from 'lucide-react';
+import { Settings, Bell, Calendar, ChevronRight, User, Download } from 'lucide-react';
 import api from '../../Services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useContagemNaoLidas } from '../../hooks/useNotificacoes';
@@ -9,6 +9,7 @@ export default function DashboardAluno() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
   const [dataAtual, setDataAtual] = useState('');
+  const [baixandoRelatorio, setBaixandoRelatorio] = useState(false);
   // Antes isto era um useState fixo em `false` que nunca era atualizado —
   // o badge do sino nunca aparecia. Agora vem do backend.
   const { total: totalNaoLidas } = useContagemNaoLidas();
@@ -54,6 +55,28 @@ export default function DashboardAluno() {
 
     carregarDados();
   }, []);
+
+  // GET /dashboard/relatorio-pdf devolve o PDF em binário; sem
+  // responseType 'blob' o axios trata como texto e o arquivo sai corrompido.
+  const baixarRelatorio = async () => {
+    setBaixandoRelatorio(true);
+    try {
+      const resposta = await api.get('/dashboard/relatorio-pdf', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([resposta.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'relatorio-dashboard.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Erro ao baixar relatório:', err);
+      alert('Não foi possível gerar o relatório.');
+    } finally {
+      setBaixandoRelatorio(false);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-white font-sans">
@@ -124,6 +147,17 @@ export default function DashboardAluno() {
             <span className="block text-[10px] font-semibold text-slate-600">Agendadas</span>
           </button>
         </div>
+
+        {/* Relatório em PDF — GET /dashboard/relatorio-pdf não tinha botão */}
+        <button
+          type="button"
+          onClick={baixarRelatorio}
+          disabled={baixandoRelatorio}
+          className="w-full flex items-center justify-center gap-2 py-2.5 border border-[#3B42B2]/25 text-[#3B42B2] hover:bg-[#3B42B2]/5 rounded-xl font-bold text-[11px] transition active:scale-[0.98] disabled:opacity-50"
+        >
+          <Download size={14} />
+          {baixandoRelatorio ? 'Gerando relatório...' : 'Baixar relatório em PDF'}
+        </button>
 
         {/* Próximos Atendimentos */}
         <div className="space-y-3">

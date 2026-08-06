@@ -5,8 +5,7 @@ import {
   QrCode,
   Barcode,
   ChevronRight,
-  PackageCheck
-} from 'lucide-react';
+  PackageCheck, Plus } from 'lucide-react';
 import api from '../../Services/api';
 
 export default function CmeProfessor() {
@@ -121,6 +120,17 @@ export default function CmeProfessor() {
             <span className="text-[10px] font-bold text-slate-400">Ações</span>
           </div>
         </div>
+
+        {/* Abrir novo ciclo de esterilização.
+            POST /esterilizacoes existia no backend mas não tinha tela. */}
+        <button
+          type="button"
+          onClick={() => navigate('/app/professor/cme/novo-ciclo')}
+          className="w-full flex items-center justify-center gap-2 bg-[#F9A814] hover:bg-[#e0940f] text-white rounded-2xl px-4 py-3.5 font-bold text-sm shadow-md transition active:scale-[0.98]"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" />
+          Abrir novo ciclo
+        </button>
 
         {/* 2. LEITURA DE CÓDIGO CME */}
         <div className="space-y-2">

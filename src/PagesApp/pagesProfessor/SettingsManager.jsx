@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Search, ChevronRight, CloudDownload,
-  User, Users, ShieldCheck, FileText, FileSearch, LogOut, Plus
+  User, Users, ShieldCheck, FileText, FileSearch, LogOut, Plus, X, Trash2
 } from 'lucide-react';
 import api from '../../Services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -18,6 +18,14 @@ export default function SettingsManager({ onClose, onLogout }) {
   const [telaInterna, setTelaInterna] = useState('configuracoes');
 
   // Estados para a tela de Usuários
+  // Edição e desativação de usuário. PUT/DELETE /usuarios/:id existiam no
+  // backend mas o app só sabia criar — não havia como corrigir um cadastro
+  // nem tirar o acesso de quem saiu.
+  const [usuarioEditando, setUsuarioEditando] = useState(null);
+  const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', telefone: '', setor: '', perfil: 'aluno', ativo: true });
+  const [salvandoUsuario, setSalvandoUsuario] = useState(false);
+  const [erroUsuario, setErroUsuario] = useState('');
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [buscaUsuarios, setBuscaUsuarios] = useState('');
   const [filtroUsuarios, setFiltroUsuarios] = useState('Todos');
 
@@ -139,6 +147,68 @@ export default function SettingsManager({ onClose, onLogout }) {
   const NIVEL_LABEL = { info: 'Informação', warn: 'Aviso', error: 'Erro' };
 
   // Filtro protegido de usuários
+  const recarregarUsuarios = () => {
+    api.get('/usuarios')
+      .then((res) => setUsuariosData(res.data.map((u) => ({
+        id: u.id, nome: u.nome, email: u.email, telefone: u.telefone,
+        setor: u.setor, ativo: u.ativo,
+        perfil: u.perfil === 'recepcionista' ? 'Recepção' : u.perfil === 'professor' ? 'Professor' : 'Aluno',
+        perfilBruto: u.perfil,
+      }))))
+      .catch((err) => console.error('Erro ao recarregar usuários:', err));
+  };
+
+  const abrirEdicaoUsuario = async (item) => {
+    setErroUsuario('');
+    setConfirmandoExclusao(false);
+    try {
+      const { data } = await api.get(`/usuarios/${item.id}`);
+      setFormUsuario({
+        nome: data.nome || '', email: data.email || '', telefone: data.telefone || '',
+        setor: data.setor || '', perfil: data.perfil || 'aluno', ativo: data.ativo !== false,
+      });
+      setUsuarioEditando(data);
+    } catch (err) {
+      console.error('Erro ao carregar usuário:', err);
+      setErroUsuario('Não foi possível carregar os dados do usuário.');
+    }
+  };
+
+  const salvarUsuario = async () => {
+    if (!formUsuario.nome.trim() || !formUsuario.email.trim()) {
+      setErroUsuario('Nome e e-mail são obrigatórios.');
+      return;
+    }
+    setSalvandoUsuario(true); setErroUsuario('');
+    try {
+      await api.put(`/usuarios/${usuarioEditando.id}`, {
+        ...usuarioEditando,
+        nome: formUsuario.nome.trim(),
+        email: formUsuario.email.trim(),
+        telefone: formUsuario.telefone.trim() || null,
+        setor: formUsuario.setor.trim() || null,
+        perfil: formUsuario.perfil,
+        ativo: formUsuario.ativo,
+      });
+      setUsuarioEditando(null);
+      recarregarUsuarios();
+    } catch (err) {
+      setErroUsuario(err.response?.data?.message || 'Não foi possível salvar as alterações.');
+    } finally { setSalvandoUsuario(false); }
+  };
+
+  const excluirUsuario = async () => {
+    setSalvandoUsuario(true); setErroUsuario('');
+    try {
+      await api.delete(`/usuarios/${usuarioEditando.id}`);
+      setUsuarioEditando(null);
+      setConfirmandoExclusao(false);
+      recarregarUsuarios();
+    } catch (err) {
+      setErroUsuario(err.response?.data?.message || 'Não foi possível excluir o usuário.');
+    } finally { setSalvandoUsuario(false); }
+  };
+
   const usuariosFiltrados = (usuariosData || []).filter((u) => {
     if (!u) return false;
     const termoBusca = (buscaUsuarios || '').toLowerCase();
@@ -356,13 +426,24 @@ export default function SettingsManager({ onClose, onLogout }) {
             </div>
             <div className="bg-white border border-gray-100 rounded-3xl p-2 shadow-sm divide-y divide-gray-100">
               {usuariosFiltrados.map((item) => (
-                <div key={item.id} className="p-3.5 flex items-center justify-between gap-3 hover:bg-gray-50/60 transition rounded-2xl cursor-pointer">
+                <div
+                  key={item.id}
+                  onClick={() => abrirEdicaoUsuario(item)}
+                  className="p-3.5 flex items-center justify-between gap-3 hover:bg-gray-50/60 transition rounded-2xl cursor-pointer"
+                >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center bg-gray-50 text-gray-700 shrink-0">
                       <User size={22} />
                     </div>
                     <div className="truncate space-y-0.5">
-                      <h4 className="text-xs font-bold text-gray-900 truncate">{item.nome}</h4>
+                      <h4 className="text-xs font-bold text-gray-900 truncate flex items-center gap-1.5">
+                        {item.nome}
+                        {item.ativo === false && (
+                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-500 uppercase shrink-0">
+                            Inativo
+                          </span>
+                        )}
+                      </h4>
                       <p className="text-[10px] text-gray-400 font-medium truncate">{item.email}</p>
                       <p className="text-[10px] font-bold text-[#3B44A8]">{item.perfil}</p>
                     </div>
@@ -620,6 +701,111 @@ export default function SettingsManager({ onClose, onLogout }) {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE EDIÇÃO DE USUÁRIO (PUT/DELETE /usuarios/:id) */}
+      {usuarioEditando && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+          onClick={() => !salvandoUsuario && setUsuarioEditando(null)}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-[#3B44A8] font-black text-sm">Editar usuário</h3>
+              <button type="button" onClick={() => setUsuarioEditando(null)} disabled={salvandoUsuario}
+                className="p-1 text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            {erroUsuario && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-[11px] rounded-xl font-semibold">
+                {erroUsuario}
+              </div>
+            )}
+
+            {[
+              { campo: 'nome', rotulo: 'Nome completo', tipo: 'text' },
+              { campo: 'email', rotulo: 'E-mail', tipo: 'email' },
+              { campo: 'telefone', rotulo: 'Telefone', tipo: 'tel' },
+              { campo: 'setor', rotulo: 'Setor', tipo: 'text' },
+            ].map(({ campo, rotulo, tipo }) => (
+              <div key={campo} className="space-y-1">
+                <label className="text-[11px] font-bold text-gray-600">{rotulo}</label>
+                <input
+                  type={tipo}
+                  value={formUsuario[campo]}
+                  onChange={(e) => setFormUsuario((f) => ({ ...f, [campo]: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3B44A8]"
+                />
+              </div>
+            ))}
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-gray-600">Perfil de acesso</label>
+              <select
+                value={formUsuario.perfil}
+                onChange={(e) => setFormUsuario((f) => ({ ...f, perfil: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3B44A8]"
+              >
+                <option value="professor">Professor</option>
+                <option value="aluno">Aluno</option>
+                <option value="recepcionista">Recepção</option>
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2.5 py-1 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={formUsuario.ativo}
+                onChange={(e) => setFormUsuario((f) => ({ ...f, ativo: e.target.checked }))}
+                className="w-4 h-4 accent-[#3B44A8]"
+              />
+              <span className="text-gray-700 text-xs font-bold">
+                Usuário ativo (pode entrar no sistema)
+              </span>
+            </label>
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              Para tirar o acesso de alguém que saiu, prefira desmarcar "ativo" a
+              excluir: o histórico de quem fez o quê continua fazendo sentido.
+            </p>
+
+            <button
+              type="button" onClick={salvarUsuario} disabled={salvandoUsuario}
+              className="w-full py-3 bg-[#3B44A8] text-white rounded-xl font-bold text-xs disabled:opacity-50"
+            >
+              {salvandoUsuario ? 'Salvando...' : 'Salvar alterações'}
+            </button>
+
+            {!confirmandoExclusao ? (
+              <button
+                type="button" onClick={() => setConfirmandoExclusao(true)} disabled={salvandoUsuario}
+                className="w-full py-2.5 text-rose-600 text-[11px] font-bold flex items-center justify-center gap-1.5 hover:bg-rose-50 rounded-xl transition"
+              >
+                <Trash2 size={14} /> Excluir usuário em definitivo
+              </button>
+            ) : (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-2.5">
+                <p className="text-[11px] text-rose-700 font-semibold leading-relaxed">
+                  Excluir <strong>{formUsuario.nome}</strong>? Esta ação não pode ser desfeita.
+                </p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setConfirmandoExclusao(false)} disabled={salvandoUsuario}
+                    className="flex-1 py-2 border border-gray-200 bg-white text-gray-600 rounded-lg font-bold text-[11px]">
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={excluirUsuario} disabled={salvandoUsuario}
+                    className="flex-1 py-2 bg-rose-500 text-white rounded-lg font-bold text-[11px] disabled:opacity-50">
+                    {salvandoUsuario ? 'Excluindo...' : 'Excluir'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

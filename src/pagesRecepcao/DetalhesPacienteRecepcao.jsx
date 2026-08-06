@@ -4,7 +4,8 @@ import {
   ArrowLeft, Edit3, User, Calendar, Phone, Mail, MapPin, 
   Search, MoreVertical, Eye, Download, FileText, Image as ImageIcon, Loader2, AlertCircle 
 } from 'lucide-react';
-import api from '../Services/api'; // Ajustado caminho e maiúscula para Services
+import api from '../Services/api';
+import AlergiasMedicamentos from '../components/AlergiasMedicamentos'; // Ajustado caminho e maiúscula para Services
 
 export default function DetalhesPacienteRecepcao() {
   const navigate = useNavigate();
@@ -250,6 +251,13 @@ export default function DetalhesPacienteRecepcao() {
                   {paciente.endereco || 'Endereço não cadastrado'}
                 </span>
               </div>
+            </div>
+
+            {/* Alergias e medicamentos: a recepção consegue ver e registrar
+                alergia (informação que o paciente costuma dar no balcão),
+                mas medicamento em uso é registro clínico. */}
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <AlergiasMedicamentos pacienteId={pacienteId} />
             </div>
           </div>
         )}

@@ -54,6 +54,11 @@ export default function ControleBiologicoProfessor() {
   const [tipo, setTipo] = useState('biologico');
   const [loteIndicador, setLoteIndicador] = useState('');
   const [observacao, setObservacao] = useState('');
+  // Lançamento do resultado do teste. O backend tinha PUT nesse recurso
+  // desde sempre, mas a tela só mostrava o selo de status — o teste nascia
+  // "pendente" e não havia como marcar aprovado/reprovado, então o alerta
+  // de falha do CME nunca chegava a disparar.
+  const [lancandoResultado, setLancandoResultado] = useState(null);
 
   const carregarControles = () => {
     setCarregando(true);
@@ -81,6 +86,21 @@ export default function ControleBiologicoProfessor() {
   }, []);
 
   // Cálculos dinâmicos para as métricas da interface
+  const lancarResultado = async (item, resultado) => {
+    setLancandoResultado(item.id);
+    try {
+      await api.put(`/esterilizacoes/${item.esterilizacao_id}/controles/${item.id}`, { resultado });
+      setListaControle((atuais) =>
+        atuais.map((c) => (c.id === item.id ? { ...c, resultado } : c))
+      );
+    } catch (err) {
+      console.error('Erro ao lançar resultado do controle biológico:', err);
+      setErro(err.response?.data?.message || 'Não foi possível lançar o resultado.');
+    } finally {
+      setLancandoResultado(null);
+    }
+  };
+
   const totalIncubacao = listaControle.filter((item) => !item.resultado || item.resultado === 'pendente').length;
   const totalNegativos = listaControle.filter((item) => item.resultado === 'aprovado').length;
   const totalNaoConformes = listaControle.filter((item) => item.resultado === 'reprovado').length;
@@ -217,11 +237,32 @@ export default function ControleBiologicoProfessor() {
                     )}
                   </div>
 
-                  {/* Badge de Status */}
-                  <div className="shrink-0 flex items-start">
+                  {/* Badge de Status + lançamento do resultado */}
+                  <div className="shrink-0 flex flex-col items-end gap-2">
                     <span className={`text-[10px] font-black px-3 py-1 rounded-full ${visual.badge}`}>
                       {visual.label}
                     </span>
+
+                    {(!item.resultado || item.resultado === 'pendente') && (
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          disabled={lancandoResultado === item.id}
+                          onClick={() => lancarResultado(item, 'aprovado')}
+                          className="text-[9px] font-black px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition active:scale-95 disabled:opacity-40"
+                        >
+                          Aprovar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={lancandoResultado === item.id}
+                          onClick={() => lancarResultado(item, 'reprovado')}
+                          className="text-[9px] font-black px-2.5 py-1 rounded-lg bg-rose-500 hover:bg-rose-600 text-white transition active:scale-95 disabled:opacity-40"
+                        >
+                          Reprovar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, User } from 'lucide-react';
 import api from '../../Services/api';
+import AlergiasMedicamentos from '../../components/AlergiasMedicamentos';
 
 export default function DetalhesPacienteAluno() {
   const navigate = useNavigate();
@@ -103,6 +104,10 @@ export default function DetalhesPacienteAluno() {
             )}
           </div>
         </div>
+
+        {/* Alergias e medicamentos em uso — informação de segurança antes
+            de qualquer procedimento (anestésico, anticoagulante). */}
+        <AlergiasMedicamentos pacienteId={pacienteId} />
 
       </div>
     </div>

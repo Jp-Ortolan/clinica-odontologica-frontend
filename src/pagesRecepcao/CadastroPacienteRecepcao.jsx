@@ -34,6 +34,11 @@ export default function CadastroPacienteRecepcao() {
   // Estados de submissão e controle da UI
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
+  // Busca de endereço pelo CEP. O backend já expunha GET /pacientes/cep/:cep
+  // (proxy do ViaCEP), mas nenhuma tela chamava — o endereço era todo
+  // digitado à mão.
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [erroCep, setErroCep] = useState('');
   const [sucesso, setSucesso] = useState('');
 
   // Preenchimento dos dados em caso de edição
@@ -98,6 +103,29 @@ export default function CadastroPacienteRecepcao() {
       setErro(msg);
     } finally {
       setCarregando(false);
+    }
+  };
+
+  const buscarEnderecoPorCep = async () => {
+    const cepLimpo = (cep || '').replace(/\D/g, '');
+    if (cepLimpo.length !== 8) {
+      setErroCep('Informe um CEP com 8 dígitos.');
+      return;
+    }
+    setBuscandoCep(true);
+    setErroCep('');
+    try {
+      const { data } = await api.get(`/pacientes/cep/${cepLimpo}`);
+      // O ViaCEP devolve logradouro/bairro/localidade/uf.
+      if (data.logradouro) setEndereco(data.logradouro);
+      if (data.bairro) setBairro(data.bairro);
+      if (data.localidade) setCidade(data.localidade);
+      if (data.uf) setUf(data.uf);
+    } catch (err) {
+      console.error('Erro ao buscar CEP:', err);
+      setErroCep('CEP não encontrado.');
+    } finally {
+      setBuscandoCep(false);
     }
   };
 
@@ -219,7 +247,26 @@ export default function CadastroPacienteRecepcao() {
 
               <div className="md:col-span-4">
                 <label className="block text-gray-700 text-xs font-bold mb-1.5">CEP</label>
-                <input type="text" placeholder="00000-000" value={cep} onChange={(e) => setCep(e.target.value)} className="input-web" />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="00000-000"
+                    value={cep}
+                    onChange={(e) => { setCep(e.target.value); setErroCep(''); }}
+                    onBlur={() => { if ((cep || '').replace(/\D/g, '').length === 8) buscarEnderecoPorCep(); }}
+                    className="input-web flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={buscarEnderecoPorCep}
+                    disabled={buscandoCep}
+                    className="px-3 bg-[#3B44A8] text-white rounded-xl text-xs font-bold disabled:opacity-40 shrink-0"
+                    title="Buscar endereço pelo CEP"
+                  >
+                    {buscandoCep ? '...' : 'Buscar'}
+                  </button>
+                </div>
+                {erroCep && <p className="text-red-500 text-[10px] font-semibold mt-1">{erroCep}</p>}
               </div>
 
               <div className="md:col-span-5">

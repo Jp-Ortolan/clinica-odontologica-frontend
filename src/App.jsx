@@ -44,6 +44,8 @@ import TelaMutiraoCirurgico from './PagesApp/pagesProfessor/TelaMutiraoCirurgico
 import DetalhesCirurgiaProfessor from './PagesApp/pagesProfessor/DetalhesCirurgiaProfessor';
 import SettingsManager from './PagesApp/pagesProfessor/SettingsManager';
 import NovoUsuario from './PagesApp/pagesProfessor/NovoUsuario';
+import NovaCirurgia from './PagesApp/pagesProfessor/NovaCirurgia';
+import NovoCicloCme from './PagesApp/pagesProfessor/NovoCicloCme';
 import PacientesProfessor from './PagesApp/pagesProfessor/PacientesProfessor';
 import DetalhesPacienteProfessor from './PagesApp/pagesProfessor/DetalhesPacienteProfessor';
 
@@ -133,6 +135,8 @@ export default function App() {
             <Route path="cme/controle-biologico" element={<ControleBiologicoProfessor />} />
             <Route path="cirurgias" element={<SpacerWrapper><GerenciadorCirurgias /></SpacerWrapper>} />
             <Route path="cirurgias/detalhes" element={<SpacerWrapper><DetalhesCirurgiaProfessor /></SpacerWrapper>} />
+            <Route path="cirurgias/nova" element={<NovaCirurgia />} />
+            <Route path="cme/novo-ciclo" element={<NovoCicloCme />} />
             <Route path="mutirao" element={<SpacerWrapper><TelaMutiraoCirurgico /></SpacerWrapper>} />
             <Route path="pacientes" element={<PacientesProfessor />} />
             <Route path="pacientes/detalhes" element={<DetalhesPacienteProfessor />} />

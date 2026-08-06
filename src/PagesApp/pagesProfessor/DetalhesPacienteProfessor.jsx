@@ -12,6 +12,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import api from '../../Services/api';
+import AlergiasMedicamentos from '../../components/AlergiasMedicamentos';
 
 // Constante de tema para facilidade de manutenção
 const BRAND_COLOR = 'bg-[#3B42B2]';
@@ -414,6 +415,10 @@ export default function DetalhesPacienteProfessor() {
                     Ver histórico completo
                   </button>
                 </div>
+
+                {/* Alergias e medicamentos — o backend já tinha os endpoints,
+                    mas nenhuma tela permitia registrar. */}
+                <AlergiasMedicamentos pacienteId={pacienteId} />
               </div>
             )}
 
