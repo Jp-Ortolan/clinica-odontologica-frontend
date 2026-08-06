@@ -247,55 +247,8 @@ export default function TelaMutiraoCirurgico() {
       </main>
 
       {/* Bottom Navigation Bar */}
-      <nav className="bg-[#3B42B2] px-2 py-3 flex items-center justify-around border-t border-white/10 sticky bottom-0 z-10">
-        <button
-          onClick={() => navigate('/app/professor')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer"
-        >
-          <Home className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Home</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/app/professor/agenda')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer"
-        >
-          <CalendarIcon className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Agenda</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/app/professor/cirurgias')}
-          className="flex flex-col items-center gap-1 text-amber-400 font-bold cursor-pointer"
-        >
-          <Scissors className="w-5 h-5 text-amber-400 rotate-90" />
-          <span className="text-[10px]">Cirurgias</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/app/professor/pacientes')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer"
-        >
-          <Users className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Pacientes</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/app/professor/cme')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer"
-        >
-          <CheckCircle className="w-5 h-5" />
-          <span className="text-[10px] font-medium">CME</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/app/professor/estoque')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer"
-        >
-          <Box className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Estoque</span>
-        </button>
-      </nav>
+      {/* A barra de navegação inferior vem do LayoutProfessor — esta tela
+          tinha uma cópia própria, o que fazia aparecer dois rodapés. */}
 
       {/* MODAL: NOVO MUTIRÃO (POST /cirurgias/mutiroes) */}
       {criando && (

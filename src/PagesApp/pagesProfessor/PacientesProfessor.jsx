@@ -202,54 +202,8 @@ export default function PacientesProfessor() {
 
       </div>
 
-      {/* BOTTOM NAVIGATION BAR */}
-      <div className="bg-[#3B42B2] px-2 py-3 flex items-center justify-around border-t border-white/10 sticky bottom-0 z-10 shrink-0">
-        <button
-          onClick={() => navigate('/app/professor/dashboard')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer transition-colors"
-        >
-          <Home className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Home</span>
-        </button>
-
-        <button 
-          onClick={() => navigate('/app/professor/agenda')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer transition-colors"
-        >
-          <CalendarIcon className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Agenda</span>
-        </button>
-
-        <button
-          onClick={() => navigate('/app/professor/cirurgias')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer transition-colors"
-        >
-          <Scissors className="w-5 h-5 rotate-90" />
-          <span className="text-[10px] font-medium">Cirurgias</span>
-        </button>
-
-        {/* ABA ATIVA COM DESTAQUE AMARELO */}
-        <button className="flex flex-col items-center gap-1 text-amber-400 font-bold cursor-pointer">
-          <Users className="w-5 h-5 text-amber-400" />
-          <span className="text-[10px]">Pacientes</span>
-        </button>
-
-        <button 
-          onClick={() => navigate('/app/professor/cme')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer transition-colors"
-        >
-          <CheckCircle className="w-5 h-5" />
-          <span className="text-[10px] font-medium">CME</span>
-        </button>
-
-        <button 
-          onClick={() => navigate('/app/professor/estoque')}
-          className="flex flex-col items-center gap-1 text-white/80 hover:text-white cursor-pointer transition-colors"
-        >
-          <Box className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Estoque</span>
-        </button>
-      </div>
+      {/* A barra de navegação inferior vem do LayoutProfessor — esta tela
+          tinha uma cópia própria, o que fazia aparecer dois rodapés. */}
 
     </div>
   );
