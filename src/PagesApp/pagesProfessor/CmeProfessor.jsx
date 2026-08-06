@@ -225,7 +225,7 @@ export default function CmeProfessor() {
               pacotesRecentes.map((item) => (
                 <div
                   key={item.id}
-                  onClick={() => navigate('/app/professor/cme/pacote-detalhes', { state: { pacote: item } })}
+                  onClick={() => navigate(`/app/professor/cme/pacote-detalhes/${item.id}`, { state: { pacote: item } })}
                   className="border border-slate-200 rounded-2xl p-3 bg-white shadow-xs flex items-center justify-between cursor-pointer hover:bg-slate-50 transition active:scale-98"
                 >
                   <div className="flex items-center gap-3">

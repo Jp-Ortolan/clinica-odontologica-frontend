@@ -36,9 +36,12 @@ export default function CadastrarMaterialProfessor() {
       .catch((err) => console.error('Erro ao carregar categorias:', err));
   }, []);
 
-  // Estados de Imagem / Arquivo
+  // Estados de Imagem / Arquivo — o backend guarda a foto como data URL
+  // base64 direto na coluna imagem_base64 (sem storage externo), então só
+  // aceita imagem (não PDF) e tem um limite de ~6MB de texto codificado.
   const [arquivo, setArquivo] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [imagemBase64, setImagemBase64] = useState('');
 
   // Estados de Controle / API
   const [salvando, setSalvando] = useState(false);
@@ -52,21 +55,25 @@ export default function CadastrarMaterialProfessor() {
   // Processa o arquivo selecionado
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setErro('O arquivo deve ter no máximo 10MB.');
-        return;
-      }
-      setErro('');
-      setArquivo(file);
+    if (!file) return;
 
-      // Se for uma imagem, gera a URL de visualização prévia
-      if (file.type.startsWith('image/')) {
-        setPreviewUrl(URL.createObjectURL(file));
-      } else {
-        setPreviewUrl('');
-      }
+    if (!file.type.startsWith('image/')) {
+      setErro('Só é possível anexar imagens (JPG, PNG etc).');
+      return;
     }
+    if (file.size > 4 * 1024 * 1024) {
+      setErro('A imagem deve ter no máximo 4MB.');
+      return;
+    }
+    setErro('');
+    setArquivo(file);
+
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      setPreviewUrl(leitor.result);
+      setImagemBase64(leitor.result);
+    };
+    leitor.readAsDataURL(file);
   };
 
   // Remove o arquivo selecionado
@@ -74,6 +81,7 @@ export default function CadastrarMaterialProfessor() {
     e.stopPropagation();
     setArquivo(null);
     setPreviewUrl('');
+    setImagemBase64('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -84,8 +92,6 @@ export default function CadastrarMaterialProfessor() {
     setSalvando(true);
 
     try {
-      // O backend de materiais não aceita upload de arquivo/imagem —
-      // só os campos cadastrais mesmo.
       const payload = {
         nome,
         codigo_barras: codigoBarras,
@@ -95,6 +101,7 @@ export default function CadastrarMaterialProfessor() {
         estoque_ideal: estoqueIdeal ? Number(estoqueIdeal) : null,
         fabricante: fabricante || undefined,
         validade: validade || undefined,
+        imagem_base64: imagemBase64 || undefined,
       };
 
       await api.post('/materiais', payload);
@@ -300,7 +307,7 @@ export default function CadastrarMaterialProfessor() {
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
-          accept="application/pdf, image/jpeg, image/png"
+          accept="image/*"
           className="hidden"
         />
 
@@ -338,7 +345,7 @@ export default function CadastrarMaterialProfessor() {
               <Image className="text-gray-400 mb-2" size={24} />
               <span className="text-gray-950 font-bold text-xs block">Adicionar imagem</span>
               <span className="text-gray-400 text-[9px] font-semibold mt-0.5">
-                Formatos aceitos: PDF, JPG, PNG • Tamanho máximo: 10MB
+                Formatos aceitos: JPG, PNG • Tamanho máximo: 4MB
               </span>
             </>
           )}

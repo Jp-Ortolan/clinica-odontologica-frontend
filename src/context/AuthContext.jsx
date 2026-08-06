@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../Services/api';
 
 const AuthContext = createContext(null);
@@ -19,6 +19,43 @@ export function AuthProvider({ children }) {
       return null;
     }
   });
+
+  // Enquanto valida o token salvo com o backend (GET /auth/me). Começa
+  // "true" só quando existe algo pra validar — sem token, não há nada
+  // a esperar e o app pode renderizar (redirecionando pro login) direto.
+  const [carregando, setCarregando] = useState(() => !!localStorage.getItem('token'));
+
+  // O login antigo confiava cegamente no que estava salvo no
+  // localStorage, sem checar se o token ainda é válido no servidor.
+  // Aqui revalidamos contra /auth/me assim que o app abre: se o usuário
+  // não existe mais ou o token expirou, a sessão local é encerrada.
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setCarregando(false);
+      return;
+    }
+
+    let cancelado = false;
+    api.get('/auth/me')
+      .then((resposta) => {
+        if (cancelado) return;
+        setUsuario(resposta.data);
+        localStorage.setItem('usuario', JSON.stringify(resposta.data));
+      })
+      .catch(() => {
+        if (cancelado) return;
+        localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
+        setUsuario(null);
+      })
+      .finally(() => {
+        if (!cancelado) setCarregando(false);
+      });
+
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function login(email, senha) {
     const resposta = await api.post('/auth/login', { email, senha });
@@ -42,7 +79,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, login, logout, rotaInicial }}>
+    <AuthContext.Provider value={{ usuario, carregando, login, logout, rotaInicial }}>
       {children}
     </AuthContext.Provider>
   );

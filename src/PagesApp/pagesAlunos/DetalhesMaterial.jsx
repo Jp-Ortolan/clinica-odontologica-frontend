@@ -12,11 +12,14 @@ export default function DetalhesMaterial() {
   const [movimentacoes, setMovimentacoes] = useState([]);
   const materialId = material?.id || paramId;
 
+  // Sempre busca o material completo por id — a lista que manda o state
+  // via navegação usa uma versão "enxuta" (sem a imagem_base64 inteira,
+  // só um booleano tem_imagem), então só essa chamada garante a foto real.
   useEffect(() => {
-    if (!material && materialId) {
+    if (materialId) {
       api.get(`/materiais/${materialId}`).then((res) => setMaterial(res.data)).catch((err) => console.error(err));
     }
-  }, [material, materialId]);
+  }, [materialId]);
 
   useEffect(() => {
     if (materialId) {
@@ -68,6 +71,13 @@ export default function DetalhesMaterial() {
         {/* CARD PRINCIPAL DO PRODUTO */}
         <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs space-y-4">
           <div className="flex gap-4">
+            {material.imagem_base64 && (
+              <img
+                src={material.imagem_base64}
+                alt={material.nome}
+                className="w-16 h-16 rounded-xl object-cover border border-gray-200 shrink-0"
+              />
+            )}
             {/* Infos Principais */}
             <div className="flex-1 min-w-0 text-[10px] text-gray-500 font-semibold space-y-0.5">
               <h2 className="text-gray-900 font-bold text-sm leading-tight truncate">{material.nome}</h2>

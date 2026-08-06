@@ -4,11 +4,9 @@ import {
   ArrowLeft,
   User,
   Package,
-  Layers,
-  Sparkles,
-  FileText,
   Plus,
-  Minus
+  Minus,
+  X
 } from 'lucide-react';
 import api from '../../Services/api';
 
@@ -41,28 +39,82 @@ export default function DetalhesCirurgia() {
     status: cirurgiaRaw.status || 'agendada',
   };
 
-  // O backend não vincula materiais a cirurgias — esta lista fica só
-  // local, como um checklist de apoio para o aluno em sala.
-  const [materiais, setMateriais] = useState([
-    { id: 1, nome: "Kit Cirúrgico 01", sub: "(1 Un)", qtd: 1, icon: Package },
-    { id: 2, nome: "Seringa Carpule", sub: "(1 Un)", qtd: 1, icon: FileText },
-    { id: 3, nome: "Campo Cirúrgico", sub: "(2 Un)", qtd: 1, icon: Layers },
-    { id: 4, nome: "Luva Descartável", sub: "(2 Un)", qtd: 4, icon: Sparkles },
-    { id: 5, nome: "Avental Cirúrgico", sub: "(1 Un)", qtd: 4, icon: Package },
-    { id: 6, nome: "Gaze", sub: "(3 Un)", qtd: 4, icon: Layers },
-  ]);
+  // Checklist real de materiais previstos, persistido em cirurgia_material
+  // (antes era só uma lista fictícia local, sem vínculo com o backend).
+  const [materiais, setMateriais] = useState([]);
+  const [carregandoMateriais, setCarregandoMateriais] = useState(true);
+  const [mostrarPicker, setMostrarPicker] = useState(false);
+  const [catalogo, setCatalogo] = useState([]);
+  const [buscaCatalogo, setBuscaCatalogo] = useState('');
+  const [adicionando, setAdicionando] = useState(false);
 
-  const alterarQuantidade = (id, delta) => {
-    setMateriais(prev =>
-      prev.map(item => {
-        if (item.id === id) {
-          const novaQtd = Math.max(0, item.qtd + delta);
-          return { ...item, qtd: novaQtd };
-        }
-        return item;
-      })
-    );
+  const carregarMateriais = () => {
+    if (!cirurgiaRaw.id) return;
+    setCarregandoMateriais(true);
+    api.get(`/cirurgias/${cirurgiaRaw.id}/materiais`)
+      .then((res) => setMateriais(res.data))
+      .catch((err) => console.error('Erro ao carregar materiais da cirurgia:', err))
+      .finally(() => setCarregandoMateriais(false));
   };
+
+  useEffect(() => {
+    carregarMateriais();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cirurgiaRaw.id]);
+
+  const alterarQuantidade = async (vinculoId, delta) => {
+    const item = materiais.find((m) => m.id === vinculoId);
+    if (!item) return;
+    const novaQtd = Math.max(0, item.quantidade + delta);
+
+    setMateriais((prev) => prev.map((m) => (m.id === vinculoId ? { ...m, quantidade: novaQtd } : m)));
+    try {
+      await api.put(`/cirurgias/${cirurgiaRaw.id}/materiais/${vinculoId}`, { quantidade: novaQtd });
+    } catch (err) {
+      console.error('Erro ao atualizar quantidade do material:', err);
+      carregarMateriais();
+    }
+  };
+
+  const removerMaterial = async (vinculoId) => {
+    const anterior = materiais;
+    setMateriais((prev) => prev.filter((m) => m.id !== vinculoId));
+    try {
+      await api.delete(`/cirurgias/${cirurgiaRaw.id}/materiais/${vinculoId}`);
+    } catch (err) {
+      console.error('Erro ao remover material da cirurgia:', err);
+      setMateriais(anterior);
+    }
+  };
+
+  const abrirPicker = () => {
+    setMostrarPicker(true);
+    if (catalogo.length === 0) {
+      api.get('/materiais').then((res) => setCatalogo(res.data)).catch((err) => console.error(err));
+    }
+  };
+
+  const adicionarMaterial = async (materialId) => {
+    setAdicionando(true);
+    try {
+      const { data: vinculo } = await api.post(`/cirurgias/${cirurgiaRaw.id}/materiais`, {
+        material_id: materialId,
+        quantidade: 1,
+      });
+      setMateriais((prev) => [...prev, vinculo]);
+    } catch (err) {
+      console.error('Erro ao adicionar material à cirurgia:', err);
+      alert(err.response?.data?.message || 'Não foi possível adicionar o material.');
+    } finally {
+      setAdicionando(false);
+    }
+  };
+
+  const idsJaVinculados = new Set(materiais.map((m) => m.material_id));
+  const catalogoFiltrado = catalogo.filter((m) =>
+    !idsJaVinculados.has(m.id) &&
+    m.nome.toLowerCase().includes(buscaCatalogo.toLowerCase().trim())
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#3B44A8] font-sans">
@@ -156,49 +208,61 @@ export default function DetalhesCirurgia() {
         <div className="space-y-2.5">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-[#3B44A8] font-black text-xs">Materiais previstos</h3>
-            <button className="text-[#3B44A8] text-[10px] font-bold hover:underline cursor-pointer">
+            <button onClick={abrirPicker} className="text-[#3B44A8] text-[10px] font-bold hover:underline cursor-pointer">
               + Adicionar materiais
             </button>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs divide-y divide-gray-100">
-            {materiais.map((mat) => {
-              const IconComp = mat.icon;
-              return (
+            {carregandoMateriais ? (
+              <div className="p-4 text-center text-gray-400 text-[11px]">Carregando materiais...</div>
+            ) : materiais.length === 0 ? (
+              <div className="p-4 text-center text-gray-400 text-[11px]">Nenhum material vinculado a esta cirurgia ainda.</div>
+            ) : (
+              materiais.map((mat) => (
                 <div key={mat.id} className="p-3.5 flex items-center justify-between">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-[#3B44A8] shrink-0">
-                      <IconComp size={18} />
+                      <Package size={18} />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="font-bold text-gray-950 text-xs truncate leading-tight">{mat.nome}</h4>
-                      <p className="text-gray-400 text-[9px] font-semibold mt-0.5">{mat.sub}</p>
+                      <h4 className="font-bold text-gray-950 text-xs truncate leading-tight">{mat.material_nome}</h4>
+                      <p className="text-gray-400 text-[9px] font-semibold mt-0.5">{mat.unidade_medida || ''}</p>
                     </div>
                   </div>
 
-                  {/* Contador de Quantidade */}
-                  <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50 overflow-hidden shrink-0 shadow-2xs">
-                    <button 
-                      onClick={() => alterarQuantidade(mat.id, -1)}
-                      className="p-1.5 px-2 text-gray-500 hover:text-[#3B44A8] hover:bg-gray-100 transition active:scale-95 cursor-pointer"
-                      aria-label={`Diminuir quantidade de ${mat.nome}`}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Contador de Quantidade */}
+                    <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50 overflow-hidden shadow-2xs">
+                      <button
+                        onClick={() => alterarQuantidade(mat.id, -1)}
+                        className="p-1.5 px-2 text-gray-500 hover:text-[#3B44A8] hover:bg-gray-100 transition active:scale-95 cursor-pointer"
+                        aria-label={`Diminuir quantidade de ${mat.material_nome}`}
+                      >
+                        <Minus size={11} className="stroke-[3]" />
+                      </button>
+                      <span className="text-gray-950 font-bold text-xs min-w-[20px] text-center select-none px-1">
+                        {mat.quantidade}
+                      </span>
+                      <button
+                        onClick={() => alterarQuantidade(mat.id, 1)}
+                        className="p-1.5 px-2 text-gray-500 hover:text-[#3B44A8] hover:bg-gray-100 transition active:scale-95 cursor-pointer"
+                        aria-label={`Aumentar quantidade de ${mat.material_nome}`}
+                      >
+                        <Plus size={11} className="stroke-[3]" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => removerMaterial(mat.id)}
+                      className="p-1.5 text-gray-400 hover:text-rose-600 transition active:scale-90 cursor-pointer"
+                      aria-label="Remover material"
                     >
-                      <Minus size={11} className="stroke-[3]" />
-                    </button>
-                    <span className="text-gray-950 font-bold text-xs min-w-[20px] text-center select-none px-1">
-                      {mat.qtd}
-                    </span>
-                    <button 
-                      onClick={() => alterarQuantidade(mat.id, 1)}
-                      className="p-1.5 px-2 text-gray-500 hover:text-[#3B44A8] hover:bg-gray-100 transition active:scale-95 cursor-pointer"
-                      aria-label={`Aumentar quantidade de ${mat.nome}`}
-                    >
-                      <Plus size={11} className="stroke-[3]" />
+                      <X size={14} />
                     </button>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
         </div>
 
@@ -206,19 +270,55 @@ export default function DetalhesCirurgia() {
 
       {/* RODAPÉ FIXO DE AÇÕES */}
       <div className="p-4 border-t border-gray-100 bg-white flex gap-3 shrink-0 shadow-lg relative z-10">
-        <button 
+        <button
           onClick={() => navigate('/app/aluno/cirurgias')}
-          className="flex-1 py-3 border border-gray-200 text-gray-700 rounded-xl font-bold text-xs hover:bg-gray-50 transition active:scale-[0.98] cursor-pointer"
+          className="flex-1 py-3 bg-[#3B44A8] text-white rounded-xl font-bold text-xs hover:bg-[#30388d] transition active:scale-[0.98] shadow-sm cursor-pointer"
         >
           Voltar
         </button>
-        <button
-          onClick={() => alert('Checklist salvo localmente nesta tela.')}
-          className="flex-1 py-3 bg-[#3B44A8] text-white rounded-xl font-bold text-xs hover:bg-[#30388d] transition active:scale-[0.98] shadow-sm cursor-pointer"
-        >
-          Salvar Materiais
-        </button>
       </div>
+
+      {/* PICKER DE MATERIAIS (adicionar ao checklist) */}
+      {mostrarPicker && (
+        <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-50" onClick={() => setMostrarPicker(false)}>
+          <div
+            className="bg-white w-full max-w-md rounded-t-3xl p-5 space-y-3 max-h-[70vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-[#3B44A8] font-black text-xs">Adicionar material</h3>
+              <button type="button" onClick={() => setMostrarPicker(false)} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar material..."
+              value={buscaCatalogo}
+              onChange={(e) => setBuscaCatalogo(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-[#3B44A8]"
+            />
+            <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+              {catalogoFiltrado.length === 0 ? (
+                <p className="text-center text-gray-400 text-[11px] py-4">Nenhum material disponível encontrado.</p>
+              ) : (
+                catalogoFiltrado.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    disabled={adicionando}
+                    onClick={() => adicionarMaterial(m.id)}
+                    className="w-full text-left py-2.5 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="text-xs font-bold text-gray-800">{m.nome}</span>
+                    <Plus size={16} className="text-[#3B44A8]" />
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

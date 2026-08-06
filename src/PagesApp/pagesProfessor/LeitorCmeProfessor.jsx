@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Package, Camera, RefreshCw } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import api from '../../Services/api';
 
 export default function LeitorCmeProfessor() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export default function LeitorCmeProfessor() {
   const [cameraAtiva, setCameraAtiva] = useState(false);
   const [erroCamera, setErroCamera] = useState(null);
   const [ultimoCodigoLido, setUltimoCodigoLido] = useState(null);
+  const [resolvendo, setResolvendo] = useState(false);
 
   const html5QrcodeRef = useRef(null);
   const scannerContainerId = 'reader-container';
@@ -62,9 +64,9 @@ export default function LeitorCmeProfessor() {
               formato: decodedResult?.result?.format?.formatName || abaAtiva,
             });
 
-            // O backend não expõe uma rota para buscar um pacote isolado pelo
-            // código lido, então levamos o código como termo de busca na tela
-            // de pacotes esterilizados (que já faz a filtragem local).
+            // O QR-code do pacote guarda "ciclo:X|material:Y|validade:...|gerado:...",
+            // não o id do pacote em si — a resolução pra um pacote exato
+            // acontece ao tocar no card "Última leitura" (handleAbrirLeitura).
           },
           () => {
             // Callback de escaneamento contínuo (frame a frame sem leitura)
@@ -90,6 +92,38 @@ export default function LeitorCmeProfessor() {
       }
     };
   }, [abaAtiva]);
+
+  // Tenta resolver o texto lido pra um pacote específico: o QR-code
+  // codifica "ciclo:X|material:Y|...", então buscamos os pacotes daquele
+  // ciclo e filtramos pelo material. Se sobrar exatamente um candidato,
+  // vamos direto pra tela de detalhes com dado real; se for ambíguo (mais
+  // de um pacote do mesmo material no mesmo ciclo) ou o texto não bater
+  // nesse formato (ex.: código de barras), caímos na busca textual.
+  const handleAbrirLeitura = async () => {
+    if (!ultimoCodigoLido?.id || resolvendo) return;
+
+    const match = ultimoCodigoLido.id.match(/ciclo:(\d+)\|material:(\d+)/);
+    if (match) {
+      const [, cicloId, materialId] = match;
+      setResolvendo(true);
+      try {
+        const { data: pacotesDoCiclo } = await api.get(`/esterilizacoes/${cicloId}/pacotes`);
+        const candidatos = pacotesDoCiclo.filter((p) => String(p.material_id) === materialId);
+        if (candidatos.length === 1) {
+          navigate(`/app/professor/cme/pacote-detalhes/${candidatos[0].id}`, {
+            state: { pacote: candidatos[0] },
+          });
+          return;
+        }
+      } catch (err) {
+        console.error('Erro ao resolver pacote a partir do QR-code:', err);
+      } finally {
+        setResolvendo(false);
+      }
+    }
+
+    navigate('/app/professor/cme/pacotes-esterilizados', { state: { buscaInicial: ultimoCodigoLido.id } });
+  };
 
   const handleVoltar = () => {
     if (window.history.length > 1) {
@@ -201,11 +235,7 @@ export default function LeitorCmeProfessor() {
           </h2>
 
           <div
-            onClick={() => {
-              if (ultimoCodigoLido?.id) {
-                navigate('/app/professor/cme/pacotes-esterilizados', { state: { buscaInicial: ultimoCodigoLido.id } });
-              }
-            }}
+            onClick={handleAbrirLeitura}
             className="border border-slate-200 rounded-2xl p-3 bg-white shadow-xs flex items-center justify-between cursor-pointer hover:bg-slate-50 transition active:scale-[0.99]"
           >
             <div className="flex items-center gap-3 overflow-hidden">
@@ -229,7 +259,7 @@ export default function LeitorCmeProfessor() {
               <span className={`text-[9px] font-extrabold px-2.5 py-0.5 rounded-full ${
                 ultimoCodigoLido ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
               }`}>
-                {ultimoCodigoLido ? 'Lido' : 'Aguardando'}
+                {resolvendo ? 'Buscando...' : ultimoCodigoLido ? 'Lido' : 'Aguardando'}
               </span>
               <ChevronRight className="w-5 h-5 text-[#3B42B2]" />
             </div>

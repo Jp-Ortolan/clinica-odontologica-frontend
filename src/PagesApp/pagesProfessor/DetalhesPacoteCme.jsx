@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, Printer, CheckCircle2 } from 'lucide-react';
 import api from '../../Services/api';
 
@@ -23,16 +23,58 @@ const TIPO_CICLO_LABEL = {
 export default function DetalhesPacoteCme() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { pacoteId } = useParams();
 
-  // O pacote real vem da tela anterior (lista de pacotes / dashboard CME),
-  // já que o backend não expõe uma rota GET para buscar um pacote isolado por id.
+  // Caminho rápido: a tela anterior (lista de pacotes / dashboard CME) já
+  // manda o pacote inteiro (com o "ciclo" embutido) via state, evitando
+  // uma nova requisição. Se o state não estiver disponível — recarregou a
+  // página, abriu o link direto, veio do leitor de QR-code — buscamos o
+  // pacote isolado por GET /esterilizacoes/pacotes/:pacoteId e completamos
+  // com os dados do ciclo numa segunda chamada.
   const [pacote, setPacote] = useState(location.state?.pacote || null);
+  const [carregando, setCarregando] = useState(!location.state?.pacote);
+  const [erro, setErro] = useState(null);
   const [registrando, setRegistrando] = useState(false);
 
-  if (!pacote) {
+  useEffect(() => {
+    if (pacote || !pacoteId) return;
+
+    let cancelado = false;
+    setCarregando(true);
+    api.get(`/esterilizacoes/pacotes/${pacoteId}`)
+      .then(async ({ data: pacoteBase }) => {
+        let ciclo = null;
+        try {
+          const { data } = await api.get(`/esterilizacoes/${pacoteBase.esterilizacao_id}`);
+          ciclo = data;
+        } catch (err) {
+          console.error('Erro ao carregar dados do ciclo do pacote:', err);
+        }
+        if (!cancelado) setPacote({ ...pacoteBase, ciclo });
+      })
+      .catch((err) => {
+        console.error('Erro ao carregar pacote:', err);
+        if (!cancelado) setErro('Pacote não encontrado.');
+      })
+      .finally(() => {
+        if (!cancelado) setCarregando(false);
+      });
+
+    return () => { cancelado = true; };
+  }, [pacote, pacoteId]);
+
+  if (carregando) {
+    return (
+      <div className="w-full h-screen bg-[#3B42B2] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!pacote || erro) {
     return (
       <div className="w-full h-screen bg-[#3B42B2] text-white flex flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="font-bold text-sm">Nenhum pacote selecionado.</p>
+        <p className="font-bold text-sm">{erro || 'Nenhum pacote selecionado.'}</p>
         <button
           onClick={() => navigate('/app/professor/cme/pacotes-esterilizados')}
           className="bg-white text-[#3B42B2] px-4 py-2 rounded-xl text-sm font-bold"

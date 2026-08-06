@@ -123,7 +123,7 @@ export default function App() {
             <Route path="agenda" element={<AgendaProfessor />} />
             <Route path="cme" element={<CmeProfessor />} />
             <Route path="cme/leitor" element={<LeitorCmeProfessor />} />
-            <Route path="cme/pacote-detalhes" element={<DetalhesPacoteCme />} />
+            <Route path="cme/pacote-detalhes/:pacoteId" element={<DetalhesPacoteCme />} />
             <Route path="cme/pacotes-esterilizados" element={<PacotesEsterilizadosProfessor />} />
             <Route path="cme/controle-biologico" element={<ControleBiologicoProfessor />} />
             <Route path="cirurgias" element={<SpacerWrapper><GerenciadorCirurgias /></SpacerWrapper>} />
